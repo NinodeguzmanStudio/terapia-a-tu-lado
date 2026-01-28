@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, BarChart2, MessageCircle, Sparkles, LogOut } from "lucide-react";
+import { Menu, X, BarChart2, MessageCircle, Sparkles, LogOut, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/chat/ChatMessage";
 import { ChatInput } from "@/components/chat/ChatInput";
@@ -8,7 +8,7 @@ import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { EmotionStats } from "@/components/dashboard/EmotionStats";
 import { PatternAnalysis } from "@/components/dashboard/PatternAnalysis";
 import { DailySuggestions } from "@/components/dashboard/DailySuggestions";
-import { Achievements } from "@/components/dashboard/Achievements";
+import { PlantProgress } from "@/components/dashboard/PlantProgress";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -41,16 +41,15 @@ interface Suggestion {
   isCompleted: boolean;
   completedAt?: Date;
   notes?: string;
+  confirmed: boolean;
 }
 
-interface Achievement {
-  id: string;
-  type: string;
-  name: string;
-  icon: string;
-  earnedAt: Date;
-  level: number;
-  progressPercentage: number;
+interface UserProfile {
+  name: string | null;
+  age: number | null;
+  is_moderator: boolean;
+  streak_days: number;
+  total_sessions: number;
 }
 
 export function TherapyApp() {
@@ -61,13 +60,18 @@ export function TherapyApp() {
   const [activeTab, setActiveTab] = useState<"chat" | "stats">("chat");
   const [conversationsToday, setConversationsToday] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
+  const [totalConversations, setTotalConversations] = useState(0);
+  
+  // User profile
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   
   // Analysis states
   const [emotionData, setEmotionData] = useState<EmotionData | null>(null);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -79,6 +83,81 @@ export function TherapyApp() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Load user profile and chat history on mount
+  useEffect(() => {
+    const loadUserData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      setUserId(user.id);
+      
+      // Load profile
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("name, age, is_moderator, streak_days, total_sessions")
+        .eq("user_id", user.id)
+        .single();
+      
+      if (profile) {
+        setUserProfile(profile);
+      }
+      
+      // Load today's messages
+      const today = new Date().toISOString().split('T')[0];
+      const { data: chatMessages } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("session_date", today)
+        .order("created_at", { ascending: true });
+      
+      if (chatMessages && chatMessages.length > 0) {
+        setMessages(chatMessages.map(m => ({
+          id: m.id,
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        })));
+        
+        // Count user messages for conversation tracking
+        const userMsgCount = chatMessages.filter(m => m.role === "user").length;
+        setMessageCount(userMsgCount);
+        setConversationsToday(Math.min(Math.floor(userMsgCount / 3), 3));
+      }
+      
+      // Load suggestions
+      const { data: savedSuggestions } = await supabase
+        .from("daily_suggestions")
+        .select("*")
+        .eq("user_id", user.id)
+        .gte("created_at", today);
+      
+      if (savedSuggestions && savedSuggestions.length > 0) {
+        setSuggestions(savedSuggestions.map(s => ({
+          id: s.id,
+          text: s.suggestion_text,
+          category: s.category || "reflexión",
+          isCompleted: s.is_completed || false,
+          completedAt: s.completed_at ? new Date(s.completed_at) : undefined,
+          notes: s.notes || undefined,
+          confirmed: s.confirmed || false,
+        })));
+      }
+      
+      // Count total conversations for action vs chat logic
+      const { count } = await supabase
+        .from("chat_messages")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("role", "user");
+      
+      setTotalConversations(count || 0);
+      
+      setIsLoadingHistory(false);
+    };
+    
+    loadUserData();
+  }, []);
 
   // Trigger analysis after message #3
   useEffect(() => {
@@ -97,7 +176,6 @@ export function TherapyApp() {
     }));
 
     try {
-      // Run emotion analysis and suggestions in parallel
       const [emotionResponse, suggestionsResponse] = await Promise.all([
         supabase.functions.invoke("therapy-chat", {
           body: { messages: chatHistory, type: "analyze_emotions" },
@@ -128,26 +206,36 @@ export function TherapyApp() {
         }
       }
 
-      if (suggestionsResponse.data?.result) {
+      if (suggestionsResponse.data?.result && userId) {
         try {
           const parsed = JSON.parse(suggestionsResponse.data.result);
           if (parsed.suggestions) {
-            setSuggestions(
-              parsed.suggestions.map((s: any, i: number) => ({
-                id: `suggestion-${i}`,
-                text: s.text,
+            const newSuggestions = parsed.suggestions.map((s: any, i: number) => ({
+              id: `suggestion-${Date.now()}-${i}`,
+              text: s.text,
+              category: s.category,
+              isCompleted: false,
+              confirmed: false,
+            }));
+            
+            setSuggestions(newSuggestions);
+            
+            // Save to database
+            for (const s of newSuggestions) {
+              await supabase.from("daily_suggestions").insert({
+                id: s.id,
+                user_id: userId,
+                suggestion_text: s.text,
                 category: s.category,
-                isCompleted: false,
-              }))
-            );
+                is_completed: false,
+                confirmed: false,
+              });
+            }
           }
         } catch (e) {
           console.error("Error parsing suggestions:", e);
         }
       }
-
-      // Update achievements based on progress
-      updateAchievements();
     } catch (error) {
       console.error("Analysis error:", error);
     } finally {
@@ -155,37 +243,14 @@ export function TherapyApp() {
     }
   };
 
-  const updateAchievements = () => {
-    const newAchievements: Achievement[] = [];
+  const saveMessage = async (message: Message) => {
+    if (!userId) return;
     
-    if (messageCount >= 3) {
-      newAchievements.push({
-        id: "first-session",
-        type: "milestone",
-        name: "Primera Sesión",
-        icon: "star",
-        earnedAt: new Date(),
-        level: 1,
-        progressPercentage: 100,
-      });
-    }
-    
-    if (conversationsToday >= 1) {
-      newAchievements.push({
-        id: "daily-check-in",
-        type: "streak",
-        name: "Check-in Diario",
-        icon: "flame",
-        earnedAt: new Date(),
-        level: 1,
-        progressPercentage: 100,
-      });
-    }
-
-    setAchievements((prev) => {
-      const existingIds = new Set(prev.map((a) => a.id));
-      const unique = newAchievements.filter((a) => !existingIds.has(a.id));
-      return [...prev, ...unique];
+    await supabase.from("chat_messages").insert({
+      id: message.id,
+      user_id: userId,
+      content: message.content,
+      role: message.role,
     });
   };
 
@@ -206,12 +271,19 @@ export function TherapyApp() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    await saveMessage(userMessage);
     setIsLoading(true);
 
+    // Include user context for personalization
     const chatHistory = [...messages, userMessage].map((m) => ({
       role: m.role,
       content: m.content,
     }));
+    
+    // Add user context as system context
+    const userContext = userProfile?.name 
+      ? `[Contexto: El usuario se llama ${userProfile.name}${userProfile.age ? `, tiene ${userProfile.age} años` : ''}. Total de conversaciones previas: ${totalConversations}]`
+      : '';
 
     try {
       const response = await fetch(
@@ -222,7 +294,12 @@ export function TherapyApp() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
-          body: JSON.stringify({ messages: chatHistory, type: "chat" }),
+          body: JSON.stringify({ 
+            messages: chatHistory, 
+            type: "chat",
+            userContext,
+            totalConversations,
+          }),
         }
       );
 
@@ -286,10 +363,13 @@ export function TherapyApp() {
         }
       }
 
+      // Save assistant message
+      await saveMessage({ ...assistantMessage, content: assistantContent });
+
       setIsStreaming(false);
       setMessageCount((prev) => prev + 1);
+      setTotalConversations((prev) => prev + 1);
       
-      // Update conversation count
       if (messageCount === 0) {
         setConversationsToday((prev) => prev + 1);
       }
@@ -303,31 +383,103 @@ export function TherapyApp() {
         variant: "destructive",
       });
     }
-  }, [messages, conversationsToday, messageCount, toast]);
+  }, [messages, conversationsToday, messageCount, toast, userId, userProfile, totalConversations]);
 
-  const handleSuggestionToggle = (id: string) => {
+  const handleSuggestionToggle = async (id: string, requireNote: boolean = true) => {
+    const suggestion = suggestions.find(s => s.id === id);
+    if (!suggestion) return;
+    
+    // If marking as complete and no note exists, require confirmation
+    if (!suggestion.isCompleted && requireNote && !suggestion.notes) {
+      toast({
+        title: "Confirmación requerida",
+        description: "Por favor, añade una breve nota explicando qué hiciste o qué cambió antes de marcar como completada.",
+      });
+      return;
+    }
+    
+    const isConfirmed = !suggestion.isCompleted && suggestion.notes && suggestion.notes.trim().length > 0;
+    
     setSuggestions((prev) =>
       prev.map((s) =>
         s.id === id
-          ? { ...s, isCompleted: !s.isCompleted, completedAt: !s.isCompleted ? new Date() : undefined }
+          ? { 
+              ...s, 
+              isCompleted: !s.isCompleted, 
+              completedAt: !s.isCompleted ? new Date() : undefined,
+              confirmed: isConfirmed,
+            }
           : s
       )
     );
+    
+    // Update in database
+    if (userId) {
+      await supabase
+        .from("daily_suggestions")
+        .update({ 
+          is_completed: !suggestion.isCompleted,
+          completed_at: !suggestion.isCompleted ? new Date().toISOString() : null,
+          confirmed: isConfirmed,
+        })
+        .eq("id", id);
+    }
   };
 
-  const handleAddNote = (id: string, note: string) => {
+  const handleAddNote = async (id: string, note: string) => {
     setSuggestions((prev) =>
       prev.map((s) => (s.id === id ? { ...s, notes: note } : s))
     );
+    
+    if (userId) {
+      await supabase
+        .from("daily_suggestions")
+        .update({ notes: note })
+        .eq("id", id);
+    }
+  };
+
+  const handleResetChat = async () => {
+    if (!userId || !userProfile?.is_moderator) return;
+    
+    // Delete all messages for this user
+    await supabase
+      .from("chat_messages")
+      .delete()
+      .eq("user_id", userId);
+    
+    // Delete all suggestions
+    await supabase
+      .from("daily_suggestions")
+      .delete()
+      .eq("user_id", userId);
+    
+    // Reset local state
+    setMessages([]);
+    setSuggestions([]);
+    setMessageCount(0);
+    setConversationsToday(0);
+    setEmotionData(null);
+    setAnalysisData(null);
+    
+    toast({
+      title: "Chat reiniciado",
+      description: "El historial ha sido borrado para pruebas.",
+    });
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
 
+  const confirmedSuggestions = suggestions.filter(s => s.confirmed).length;
+  const welcomeMessage = userProfile?.name 
+    ? `Hola, ${userProfile.name}. ` 
+    : "";
+
   return (
     <div className="min-h-screen bg-gradient-sunset flex">
-      {/* Mobile sidebar toggle - positioned at top right */}
+      {/* Mobile sidebar toggle */}
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
         className="lg:hidden fixed top-4 right-4 z-50 p-2 bg-card rounded-lg shadow-soft"
@@ -415,8 +567,8 @@ export function TherapyApp() {
               </div>
             </div>
 
-            {/* Logout */}
-            <div className="p-4">
+            {/* Logout and moderator options */}
+            <div className="p-4 space-y-2">
               <Button
                 variant="ghost"
                 className="w-full justify-start text-muted-foreground hover:text-foreground"
@@ -425,6 +577,18 @@ export function TherapyApp() {
                 <LogOut className="h-4 w-4 mr-2" />
                 Cerrar sesión
               </Button>
+              
+              {/* Moderator reset option - only visible for moderators */}
+              {userProfile?.is_moderator && (
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-muted-foreground hover:text-destructive"
+                  onClick={handleResetChat}
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reiniciar chat (modo prueba)
+                </Button>
+              )}
             </div>
           </motion.aside>
         )}
@@ -460,7 +624,13 @@ export function TherapyApp() {
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6">
               <div className="max-w-3xl mx-auto">
-                {messages.length === 0 && (
+                {isLoadingHistory ? (
+                  <div className="text-center py-12">
+                    <div className="animate-pulse text-muted-foreground">
+                      Cargando tu historial...
+                    </div>
+                  </div>
+                ) : messages.length === 0 ? (
                   <div className="text-center py-12">
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
@@ -470,22 +640,46 @@ export function TherapyApp() {
                       <div className="w-20 h-20 rounded-full bg-gradient-warm flex items-center justify-center mb-6 shadow-glow">
                         <Sparkles className="h-10 w-10 text-white" />
                       </div>
-                      <h3 className="text-2xl font-serif mb-2">Bienvenido</h3>
+                      <h3 className="text-2xl font-serif mb-2">
+                        {welcomeMessage}Bienvenido
+                      </h3>
                       <p className="text-muted-foreground max-w-sm">
                         Este es tu espacio seguro. Cuéntame, ¿cómo te sientes hoy?
                       </p>
                     </motion.div>
                   </div>
+                ) : (
+                  <>
+                    {messages.map((message) => (
+                      <ChatMessage
+                        key={message.id}
+                        role={message.role}
+                        content={message.content}
+                        isStreaming={isStreaming && message.id === messages[messages.length - 1]?.id && message.role === "assistant"}
+                      />
+                    ))}
+                    
+                    {/* Gentle nudge after 6+ conversations */}
+                    {totalConversations >= 6 && messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-4 p-4 bg-sage-light/30 rounded-xl text-center"
+                      >
+                        <p className="text-sm text-muted-foreground">
+                          💫 Has tenido varias conversaciones profundas. 
+                          <button 
+                            onClick={() => setActiveTab("stats")}
+                            className="text-primary hover:underline ml-1"
+                          >
+                            Revisa tu progreso
+                          </button>
+                          {" "}para ver cómo ha crecido tu planta.
+                        </p>
+                      </motion.div>
+                    )}
+                  </>
                 )}
-
-                {messages.map((message) => (
-                  <ChatMessage
-                    key={message.id}
-                    role={message.role}
-                    content={message.content}
-                    isStreaming={isStreaming && message.id === messages[messages.length - 1]?.id && message.role === "assistant"}
-                  />
-                ))}
 
                 {isLoading && <TypingIndicator />}
                 <div ref={messagesEndRef} />
@@ -517,11 +711,18 @@ export function TherapyApp() {
               >
                 <h2 className="text-3xl font-serif mb-2">Mi Progreso</h2>
                 <p className="text-muted-foreground">
-                  Análisis basado en tus conversaciones
+                  {userProfile?.name ? `${userProfile.name}, este es tu` : 'Tu'} análisis basado en tus conversaciones
                 </p>
               </motion.div>
 
               <div className="grid gap-6 lg:grid-cols-2">
+                <PlantProgress
+                  confirmedSuggestions={confirmedSuggestions}
+                  totalSuggestions={suggestions.length}
+                  streakDays={userProfile?.streak_days || 0}
+                  totalSessions={userProfile?.total_sessions || 0}
+                  isLoading={false}
+                />
                 <EmotionStats data={emotionData} isLoading={isAnalyzing} />
                 <PatternAnalysis data={analysisData} isLoading={isAnalyzing} />
                 <DailySuggestions
@@ -529,13 +730,6 @@ export function TherapyApp() {
                   onToggle={handleSuggestionToggle}
                   onAddNote={handleAddNote}
                   isLoading={isAnalyzing}
-                />
-                <Achievements
-                  achievements={achievements}
-                  currentLevel={1}
-                  totalProgress={messageCount >= 3 ? 25 : (messageCount / 3) * 25}
-                  streak={conversationsToday > 0 ? 1 : 0}
-                  isLoading={false}
                 />
               </div>
             </div>

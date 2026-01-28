@@ -12,6 +12,7 @@ interface Suggestion {
   isCompleted: boolean;
   completedAt?: Date;
   notes?: string;
+  confirmed: boolean;
 }
 
 interface DailySuggestionsProps {
@@ -92,8 +93,10 @@ export function DailySuggestions({ suggestions, onToggle, onAddNote, isLoading }
               transition={{ delay: index * 0.05 }}
               className={cn(
                 "border rounded-xl transition-all overflow-hidden",
-                suggestion.isCompleted
-                  ? "bg-sage-light/30 border-sage/30"
+                suggestion.isCompleted && suggestion.confirmed
+                  ? "bg-sage-light/50 border-sage/50"
+                  : suggestion.isCompleted
+                  ? "bg-sand/30 border-sand"
                   : "bg-background border-border hover:border-primary/30"
               )}
             >
@@ -102,6 +105,7 @@ export function DailySuggestions({ suggestions, onToggle, onAddNote, isLoading }
                   checked={suggestion.isCompleted}
                   onCheckedChange={() => onToggle(suggestion.id)}
                   className="mt-0.5"
+                  disabled={!suggestion.notes && !suggestion.isCompleted}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -116,12 +120,20 @@ export function DailySuggestions({ suggestions, onToggle, onAddNote, isLoading }
                     </span>
                   </div>
                   {suggestion.completedAt && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {new Date(suggestion.completedAt).toLocaleTimeString("es", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {new Date(suggestion.completedAt).toLocaleTimeString("es", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </div>
+                      {suggestion.isCompleted && !suggestion.confirmed && (
+                        <span className="text-warning text-[10px]">• sin confirmar</span>
+                      )}
+                      {suggestion.confirmed && (
+                        <span className="text-primary text-[10px]">• confirmada ✓</span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -146,8 +158,13 @@ export function DailySuggestions({ suggestions, onToggle, onAddNote, isLoading }
                     className="px-4 pb-4 border-t border-border/50"
                   >
                     <div className="pt-3">
+                      <p className="text-xs text-muted-foreground mb-2">
+                        {suggestion.isCompleted 
+                          ? "Nota sobre tu experiencia:"
+                          : "Añade una nota para poder marcar como completada:"}
+                      </p>
                       <Textarea
-                        placeholder="Añade notas sobre esta actividad..."
+                        placeholder="¿Qué hiciste? ¿Qué cambió en ti?"
                         value={suggestion.notes || noteText}
                         onChange={(e) => setNoteText(e.target.value)}
                         onBlur={() => {
@@ -158,6 +175,11 @@ export function DailySuggestions({ suggestions, onToggle, onAddNote, isLoading }
                         }}
                         className="min-h-[60px] text-sm bg-background/50"
                       />
+                      {!suggestion.isCompleted && suggestion.notes && (
+                        <p className="text-xs text-primary mt-2">
+                          ✓ Ahora puedes marcar como completada
+                        </p>
+                      )}
                     </div>
                   </motion.div>
                 )}

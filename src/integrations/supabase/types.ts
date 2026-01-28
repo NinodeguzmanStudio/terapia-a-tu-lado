@@ -43,7 +43,9 @@ export type Database = {
       }
       daily_suggestions: {
         Row: {
+          category: string | null
           completed_at: string | null
+          confirmed: boolean | null
           created_at: string
           id: string
           is_completed: boolean | null
@@ -52,7 +54,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          category?: string | null
           completed_at?: string | null
+          confirmed?: boolean | null
           created_at?: string
           id?: string
           is_completed?: boolean | null
@@ -61,7 +65,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          category?: string | null
           completed_at?: string | null
+          confirmed?: boolean | null
           created_at?: string
           id?: string
           is_completed?: boolean | null
@@ -118,36 +124,45 @@ export type Database = {
       }
       profiles: {
         Row: {
+          age: number | null
           avatar_url: string | null
           conversations_today: number | null
           created_at: string
           display_name: string | null
           id: string
+          is_moderator: boolean | null
           last_conversation_date: string | null
+          name: string | null
           streak_days: number | null
           total_sessions: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          age?: number | null
           avatar_url?: string | null
           conversations_today?: number | null
           created_at?: string
           display_name?: string | null
           id?: string
+          is_moderator?: boolean | null
           last_conversation_date?: string | null
+          name?: string | null
           streak_days?: number | null
           total_sessions?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          age?: number | null
           avatar_url?: string | null
           conversations_today?: number | null
           created_at?: string
           display_name?: string | null
           id?: string
+          is_moderator?: boolean | null
           last_conversation_date?: string | null
+          name?: string | null
           streak_days?: number | null
           total_sessions?: number | null
           updated_at?: string
