@@ -327,12 +327,12 @@ export function TherapyApp() {
 
   return (
     <div className="min-h-screen bg-gradient-sunset flex">
-      {/* Mobile sidebar toggle */}
+      {/* Mobile sidebar toggle - positioned at top right */}
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-card rounded-lg shadow-soft"
+        className="lg:hidden fixed top-4 right-4 z-50 p-2 bg-card rounded-lg shadow-soft"
       >
-        {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        <Menu className="h-5 w-5" />
       </button>
 
       {/* Sidebar */}
@@ -347,14 +347,24 @@ export function TherapyApp() {
               sidebarOpen ? "block" : "hidden lg:flex"
             )}
           >
-            {/* Logo */}
+            {/* Logo with close button */}
             <div className="p-6 border-b border-sidebar-border">
-              <h1 className="text-2xl font-serif text-sidebar-foreground">
-                Terapia a Tu Lado
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Tu espacio de bienestar
-              </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-serif text-sidebar-foreground">
+                    Terapia a Tu Lado
+                  </h1>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Tu espacio de bienestar
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="lg:hidden p-2 hover:bg-sidebar-accent rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5 text-sidebar-foreground" />
+                </button>
+              </div>
             </div>
 
             {/* Navigation */}
