@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Sprout, Leaf, TreeDeciduous, Flower2, Sun } from "lucide-react";
+import { Circle, Compass, Layers, Target, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PlantProgressProps {
@@ -10,46 +10,46 @@ interface PlantProgressProps {
   isLoading?: boolean;
 }
 
-const plantStages = [
+const progressStages = [
   { 
-    name: "Semilla", 
-    icon: Sun, 
+    name: "Inicio", 
+    icon: Circle, 
     minProgress: 0, 
-    description: "Tu viaje acaba de empezar",
-    color: "from-sand to-cream",
-    plantImage: "🌱"
+    description: "Observando tu proceso",
+    color: "from-muted to-muted/80",
+    visualElement: "○"
   },
   { 
-    name: "Brote", 
-    icon: Sprout, 
+    name: "Exploración", 
+    icon: Compass, 
     minProgress: 15, 
-    description: "Estás echando raíces",
-    color: "from-sage-light to-sage",
-    plantImage: "🌿"
+    description: "Conociendo tus patrones",
+    color: "from-sage-light/50 to-sage-light",
+    visualElement: "◎"
   },
   { 
-    name: "Tallo con hojas", 
-    icon: Leaf, 
+    name: "Claridad", 
+    icon: Layers, 
     minProgress: 35, 
-    description: "Tu crecimiento es visible",
-    color: "from-sage to-sage-dark",
-    plantImage: "🪴"
+    description: "Integrando comprensiones",
+    color: "from-sage-light to-sage",
+    visualElement: "◉"
   },
   { 
-    name: "Crecimiento", 
-    icon: TreeDeciduous, 
+    name: "Integración", 
+    icon: Target, 
     minProgress: 60, 
-    description: "Estás floreciendo",
+    description: "Consolidando cambios",
     color: "from-terracotta-light to-terracotta",
-    plantImage: "🌳"
+    visualElement: "●"
   },
   { 
-    name: "Pronto a florecer", 
-    icon: Flower2, 
+    name: "Transformación", 
+    icon: Sparkles, 
     minProgress: 85, 
-    description: "Tu transformación brilla",
+    description: "Evolución visible",
     color: "from-terracotta to-earth",
-    plantImage: "🌸"
+    visualElement: "✦"
   },
 ];
 
@@ -58,7 +58,6 @@ function calculateProgress(
   streakDays: number,
   totalSessions: number
 ): number {
-  // Weight: 50% confirmed suggestions, 30% streak, 20% sessions
   const suggestionScore = Math.min(confirmedSuggestions * 5, 50);
   const streakScore = Math.min(streakDays * 6, 30);
   const sessionScore = Math.min(totalSessions * 4, 20);
@@ -67,8 +66,8 @@ function calculateProgress(
 }
 
 function getCurrentStage(progress: number) {
-  let currentStage = plantStages[0];
-  for (const stage of plantStages) {
+  let currentStage = progressStages[0];
+  for (const stage of progressStages) {
     if (progress >= stage.minProgress) {
       currentStage = stage;
     }
@@ -76,9 +75,9 @@ function getCurrentStage(progress: number) {
   return currentStage;
 }
 
-function getNextStage(currentStage: typeof plantStages[0]) {
-  const currentIndex = plantStages.findIndex(s => s.name === currentStage.name);
-  return plantStages[Math.min(currentIndex + 1, plantStages.length - 1)];
+function getNextStage(currentStage: typeof progressStages[0]) {
+  const currentIndex = progressStages.findIndex(s => s.name === currentStage.name);
+  return progressStages[Math.min(currentIndex + 1, progressStages.length - 1)];
 }
 
 export function PlantProgress({ 
@@ -100,9 +99,9 @@ export function PlantProgress({
   if (isLoading) {
     return (
       <div className="therapy-card">
-        <h3 className="text-xl font-serif mb-4">Tu Planta de Crecimiento</h3>
+        <h3 className="text-xl font-serif mb-4">Estado de tu proceso</h3>
         <div className="animate-pulse space-y-4">
-          <div className="h-32 bg-muted rounded-xl" />
+          <div className="h-16 bg-muted rounded-xl" />
           <div className="h-4 bg-muted rounded w-3/4" />
         </div>
       </div>
@@ -110,55 +109,46 @@ export function PlantProgress({
   }
 
   const StageIcon = currentStage.icon;
+  const isInitialStage = currentStage.name === "Inicio";
 
   return (
     <div className="therapy-card">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-serif">Tu Planta de Crecimiento</h3>
-        <div className="text-sm text-muted-foreground">
-          {confirmedSuggestions} confirmadas
-        </div>
+      {/* 1. Informative message first */}
+      <div className="mb-6">
+        <h3 className="text-xl font-serif mb-2">Estado de tu proceso</h3>
+        <p className="text-sm text-muted-foreground">
+          Revisa tu progreso para observar cómo te estás sintiendo ahora.
+        </p>
       </div>
 
-      {/* Plant visualization */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className={cn(
-          "relative p-8 rounded-xl mb-6 overflow-hidden bg-gradient-to-br text-center",
-          currentStage.color
-        )}
-      >
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", delay: 0.2 }}
-          className="text-7xl mb-4"
-        >
-          {currentStage.plantImage}
-        </motion.div>
-        
-        <div className="relative z-10">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <StageIcon className="h-5 w-5" />
-            <h4 className="text-2xl font-serif">{currentStage.name}</h4>
-          </div>
-          <p className="text-sm opacity-80">{currentStage.description}</p>
+      {/* 2. Patterns and suggestions info */}
+      <div className="p-4 bg-muted/30 rounded-lg mb-6">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Reflexiones confirmadas</span>
+          <span className="font-medium">{confirmedSuggestions}</span>
         </div>
+        {streakDays > 0 && (
+          <div className="flex items-center justify-between text-sm mt-2">
+            <span className="text-muted-foreground">Días de constancia</span>
+            <span className="font-medium">{streakDays}</span>
+          </div>
+        )}
+        {totalSessions > 0 && (
+          <div className="flex items-center justify-between text-sm mt-2">
+            <span className="text-muted-foreground">Sesiones completadas</span>
+            <span className="font-medium">{totalSessions}</span>
+          </div>
+        )}
+      </div>
 
-        {/* Decorative elements */}
-        <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/10" />
-        <div className="absolute -bottom-4 -left-4 w-16 h-16 rounded-full bg-white/5" />
-      </motion.div>
-
-      {/* Progress to next stage */}
-      {!isMaxStage && (
+      {/* Progress bar */}
+      {!isInitialStage && !isMaxStage && (
         <div className="mb-6">
           <div className="flex items-center justify-between text-sm mb-2">
-            <span className="text-muted-foreground">Progreso hacia {nextStage.name}</span>
+            <span className="text-muted-foreground">Hacia: {nextStage.name}</span>
             <span className="font-medium">{Math.round(progressToNext)}%</span>
           </div>
-          <div className="h-3 bg-muted rounded-full overflow-hidden">
+          <div className="h-2 bg-muted rounded-full overflow-hidden">
             <motion.div
               className="h-full bg-gradient-warm rounded-full"
               initial={{ width: 0 }}
@@ -169,9 +159,36 @@ export function PlantProgress({
         </div>
       )}
 
-      {/* Stage indicators */}
-      <div className="flex justify-between items-center">
-        {plantStages.map((stage, index) => {
+      {/* 3. Visual reference - secondary, at the end */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className={cn(
+          "relative p-4 rounded-xl overflow-hidden bg-gradient-to-br",
+          currentStage.color
+        )}
+      >
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "w-10 h-10 rounded-full flex items-center justify-center",
+            isInitialStage ? "bg-muted/50" : "bg-white/20"
+          )}>
+            <StageIcon className={cn(
+              "h-5 w-5",
+              isInitialStage ? "text-muted-foreground" : "text-foreground/80"
+            )} />
+          </div>
+          <div>
+            <p className="text-sm font-medium">{currentStage.name}</p>
+            <p className="text-xs opacity-70">{currentStage.description}</p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Stage indicators - discrete */}
+      <div className="flex justify-between items-center mt-4 px-2">
+        {progressStages.map((stage, index) => {
           const isPast = progress >= stage.minProgress;
           const isCurrent = stage.name === currentStage.name;
           const Icon = stage.icon;
@@ -179,33 +196,23 @@ export function PlantProgress({
           return (
             <motion.div
               key={stage.name}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: index * 0.05 }}
               className={cn(
                 "flex flex-col items-center gap-1",
-                isCurrent ? "text-foreground" : isPast ? "text-primary" : "text-muted-foreground/40"
+                isCurrent ? "text-foreground" : isPast ? "text-primary/70" : "text-muted-foreground/30"
               )}
             >
               <div className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center transition-all",
-                isCurrent ? "bg-gradient-warm shadow-soft" : isPast ? "bg-primary/20" : "bg-muted"
+                "w-6 h-6 rounded-full flex items-center justify-center transition-all",
+                isCurrent ? "bg-primary/20" : isPast ? "bg-primary/10" : "bg-muted/50"
               )}>
-                <Icon className={cn("h-4 w-4", isCurrent && "text-white")} />
+                <Icon className="h-3 w-3" />
               </div>
-              <span className="text-[10px] text-center max-w-[50px] leading-tight">
-                {stage.name}
-              </span>
             </motion.div>
           );
         })}
-      </div>
-
-      {/* Growth tips */}
-      <div className="mt-6 p-4 bg-muted/30 rounded-lg">
-        <p className="text-xs text-muted-foreground text-center">
-          💡 Tu planta crece con sugerencias confirmadas, constancia y reflexión genuina
-        </p>
       </div>
     </div>
   );
