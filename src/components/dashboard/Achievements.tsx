@@ -30,11 +30,11 @@ const iconMap: Record<string, React.ElementType> = {
 };
 
 const levelConfig = [
-  { name: "Semilla", minProgress: 0, color: "from-sand to-cream" },
-  { name: "Brote", minProgress: 20, color: "from-sage-light to-sage" },
-  { name: "Raíz", minProgress: 40, color: "from-terracotta-light to-terracotta" },
-  { name: "Árbol", minProgress: 60, color: "from-sage to-sage-dark" },
-  { name: "Bosque", minProgress: 80, color: "from-terracotta to-earth" },
+  { name: "Inicio", minProgress: 0, color: "from-muted to-muted/80" },
+  { name: "Exploración", minProgress: 20, color: "from-sage-light/50 to-sage-light" },
+  { name: "Claridad", minProgress: 40, color: "from-sage-light to-sage" },
+  { name: "Integración", minProgress: 60, color: "from-terracotta-light to-terracotta" },
+  { name: "Transformación", minProgress: 80, color: "from-terracotta to-earth" },
 ];
 
 export function Achievements({ achievements, currentLevel, totalProgress, streak, isLoading }: AchievementsProps) {
