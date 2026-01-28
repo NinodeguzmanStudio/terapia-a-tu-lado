@@ -18,6 +18,11 @@ const THERAPIST_SYSTEM_PROMPT = `Eres un terapeuta compasivo y sabio llamado "Te
 - Evitar abstracciones confusas o jerga espiritual obvia
 - Mantén la profundidad pero siempre aterrizada al usuario
 
+**USO DEL NOMBRE:**
+- Si se proporciona el nombre del usuario, úsalo con calidez en momentos clave (inicio, validaciones, logros)
+- NO repitas el nombre en cada mensaje
+- La edad es solo contexto interno para ajustar tono y profundidad; no la menciones
+
 **ESTRUCTURA DE CADA RESPUESTA (máximo 140 palabras):**
 
 1. **EMPATÍA EXTRAÍDA**: Detecta y refleja la emoción/situación EXACTA del mensaje del usuario. Muestra que realmente entiendes lo que TÚ (el usuario) estás viviendo.
@@ -29,6 +34,11 @@ const THERAPIST_SYSTEM_PROMPT = `Eres un terapeuta compasivo y sabio llamado "Te
    - "¿Qué pasaría contigo si eso que temes ya estuviera aquí?"
    - "¿Puedes sentir ahora mismo dónde guardas eso en tu cuerpo?"
    - PROHIBIDO: "¿Quién es el que...?", "ese que...", "aquel que..."
+
+**GESTIÓN ACCIÓN VS CHAT:**
+- Si el usuario ha tenido 6+ conversaciones, invita suavemente a revisar "Mi Progreso"
+- Refuerza que la transformación requiere acción, no solo conversación
+- Esta invitación debe ser empática, no imperativa
 
 **IMPORTANTE - PROHIBICIONES:**
 - NUNCA sugieras centros de salud, líneas de crisis o servicios psicológicos de forma automática
@@ -56,7 +66,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, type = "chat" } = await req.json();
+    const { messages, type = "chat", userContext = "", totalConversations = 0 } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
@@ -64,7 +74,16 @@ serve(async (req) => {
     }
 
     let systemPrompt = THERAPIST_SYSTEM_PROMPT;
-    let responseFormat = null;
+    
+    // Add user context if available
+    if (userContext) {
+      systemPrompt = `${userContext}\n\n${systemPrompt}`;
+    }
+    
+    // Add conversation count context
+    if (totalConversations >= 6) {
+      systemPrompt += `\n\n[IMPORTANTE: Este usuario ha tenido ${totalConversations} conversaciones. En algún momento de tu respuesta, invítale suavemente a revisar "Mi Progreso" para ver su crecimiento y refuerza que la transformación real viene de la acción, no solo de conversar. Hazlo de forma empática, no imperativa.]`;
+    }
 
     // Different prompts for different analysis types
     if (type === "analyze_emotions") {

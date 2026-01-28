@@ -1,17 +1,21 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Sparkles, Mail, Lock, Eye, EyeOff, ArrowRight, User, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import heroImage from "@/assets/hero-meditation.jpg";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
-const authSchema = z.object({
+const loginSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+});
+
+const signupSchema = loginSchema.extend({
+  name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
+  age: z.number().min(13, "Debes tener al menos 13 años").max(120, "Edad inválida"),
 });
 
 interface AuthPageProps {
@@ -22,22 +26,33 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [age, setAge] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; name?: string; age?: string }>({});
   const { toast } = useToast();
 
   const validateForm = () => {
     try {
-      authSchema.parse({ email, password });
+      if (isLogin) {
+        loginSchema.parse({ email, password });
+      } else {
+        signupSchema.parse({ 
+          email, 
+          password, 
+          name, 
+          age: age ? parseInt(age) : 0 
+        });
+      }
       setErrors({});
       return true;
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const fieldErrors: { email?: string; password?: string } = {};
+        const fieldErrors: { email?: string; password?: string; name?: string; age?: string } = {};
         error.errors.forEach((err) => {
-          if (err.path[0] === "email") fieldErrors.email = err.message;
-          if (err.path[0] === "password") fieldErrors.password = err.message;
+          const field = err.path[0] as string;
+          fieldErrors[field as keyof typeof fieldErrors] = err.message;
         });
         setErrors(fieldErrors);
       }
@@ -61,7 +76,7 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
         onAuthSuccess();
       } else {
         const redirectUrl = `${window.location.origin}/`;
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -74,9 +89,26 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
           }
           throw error;
         }
+        
+        // Create profile with name and age
+        if (data.user) {
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .insert({
+              user_id: data.user.id,
+              name: name,
+              age: parseInt(age),
+              display_name: name,
+            });
+          
+          if (profileError) {
+            console.error("Error creating profile:", profileError);
+          }
+        }
+
         toast({
-          title: "¡Cuenta creada!",
-          description: "Ya puedes empezar tu viaje de bienestar.",
+          title: `¡Bienvenido/a, ${name}!`,
+          description: "Tu cuenta ha sido creada. Ya puedes empezar tu viaje de bienestar.",
         });
         onAuthSuccess();
       }
@@ -123,11 +155,55 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
             <p className="text-sm text-muted-foreground">
               {isLogin
                 ? "Ingresa a tu espacio personal"
-                : "Crea tu cuenta en segundos"}
+                : "Cuéntanos un poco sobre ti"}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Name field - only on signup */}
+            {!isLogin && (
+              <div className="space-y-2">
+                <Label htmlFor="name">¿Cómo te llamas?</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="name"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Tu nombre"
+                    className="pl-10"
+                  />
+                </div>
+                {errors.name && (
+                  <p className="text-xs text-destructive">{errors.name}</p>
+                )}
+              </div>
+            )}
+
+            {/* Age field - only on signup */}
+            {!isLogin && (
+              <div className="space-y-2">
+                <Label htmlFor="age">¿Cuántos años tienes?</Label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="age"
+                    type="number"
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    placeholder="Tu edad"
+                    className="pl-10"
+                    min={13}
+                    max={120}
+                  />
+                </div>
+                {errors.age && (
+                  <p className="text-xs text-destructive">{errors.age}</p>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
