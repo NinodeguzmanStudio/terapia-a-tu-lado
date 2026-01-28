@@ -2,95 +2,145 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+
+/* Terapia a Tu Lado - Design System
+   Warm, mature, professional therapy app
+   Earthy tones with terracotta, sage, cream
+   All colors MUST be HSL */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Core Backgrounds */
+    --background: 40 33% 98%;
+    --foreground: 25 20% 15%;
+    
+    /* Cards & Surfaces */
+    --card: 40 40% 97%;
+    --card-foreground: 25 20% 15%;
+    
+    --popover: 40 40% 99%;
+    --popover-foreground: 25 20% 15%;
+    
+    /* Primary - Terracotta */
+    --primary: 16 45% 55%;
+    --primary-foreground: 40 40% 98%;
+    
+    /* Secondary - Sage Green */
+    --secondary: 140 20% 75%;
+    --secondary-foreground: 140 25% 20%;
+    
+    /* Muted - Warm Gray */
+    --muted: 30 15% 92%;
+    --muted-foreground: 25 10% 45%;
+    
+    /* Accent - Golden Sand */
+    --accent: 38 60% 70%;
+    --accent-foreground: 30 40% 20%;
+    
+    /* Destructive */
+    --destructive: 0 60% 50%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Borders & Inputs */
+    --border: 30 20% 88%;
+    --input: 30 20% 90%;
+    --ring: 16 45% 55%;
+    
+    --radius: 0.75rem;
+    
+    /* Custom Therapy Colors */
+    --terracotta: 16 45% 55%;
+    --terracotta-light: 16 40% 70%;
+    --terracotta-dark: 16 50% 40%;
+    
+    --sage: 140 20% 60%;
+    --sage-light: 140 25% 85%;
+    --sage-dark: 140 25% 35%;
+    
+    --cream: 40 40% 95%;
+    --cream-dark: 40 30% 85%;
+    
+    --earth: 25 30% 30%;
+    --earth-light: 25 20% 50%;
+    
+    --sand: 38 45% 80%;
+    --sand-light: 38 50% 92%;
+    
+    /* Emotion Colors */
+    --emotion-anxiety: 30 80% 55%;
+    --emotion-sadness: 210 50% 55%;
+    --emotion-anger: 0 65% 55%;
+    --emotion-stability: 140 40% 50%;
+    --emotion-joy: 45 85% 60%;
+    
+    /* Gradients */
+    --gradient-warm: linear-gradient(135deg, hsl(16 45% 55%) 0%, hsl(38 60% 70%) 100%);
+    --gradient-sage: linear-gradient(135deg, hsl(140 20% 75%) 0%, hsl(140 25% 60%) 100%);
+    --gradient-sunset: linear-gradient(180deg, hsl(40 40% 97%) 0%, hsl(16 30% 92%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(25 25% 20%) 0%, hsl(16 40% 30%) 50%, hsl(140 20% 25%) 100%);
+    
+    /* Shadows */
+    --shadow-soft: 0 4px 20px -4px hsl(25 30% 30% / 0.1);
+    --shadow-card: 0 8px 30px -8px hsl(25 30% 30% / 0.15);
+    --shadow-elevated: 0 20px 60px -15px hsl(25 30% 30% / 0.2);
+    --shadow-glow: 0 0 40px -10px hsl(16 45% 55% / 0.3);
+    
+    /* Sidebar */
+    --sidebar-background: 40 30% 96%;
+    --sidebar-foreground: 25 20% 25%;
+    --sidebar-primary: 16 45% 55%;
+    --sidebar-primary-foreground: 40 40% 98%;
+    --sidebar-accent: 140 20% 90%;
+    --sidebar-accent-foreground: 140 25% 25%;
+    --sidebar-border: 30 20% 88%;
+    --sidebar-ring: 16 45% 55%;
+    
+    /* Chart Colors */
+    --chart-1: 16 45% 55%;
+    --chart-2: 140 25% 55%;
+    --chart-3: 38 60% 60%;
+    --chart-4: 210 50% 55%;
+    --chart-5: 0 65% 55%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --background: 25 25% 8%;
+    --foreground: 40 30% 92%;
+    
+    --card: 25 20% 12%;
+    --card-foreground: 40 30% 92%;
+    
+    --popover: 25 20% 10%;
+    --popover-foreground: 40 30% 92%;
+    
+    --primary: 16 50% 60%;
+    --primary-foreground: 25 25% 10%;
+    
+    --secondary: 140 15% 25%;
+    --secondary-foreground: 140 20% 85%;
+    
+    --muted: 25 15% 18%;
+    --muted-foreground: 30 15% 60%;
+    
+    --accent: 38 40% 30%;
+    --accent-foreground: 38 50% 85%;
+    
+    --destructive: 0 55% 45%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 25 15% 20%;
+    --input: 25 15% 22%;
+    --ring: 16 50% 60%;
+    
+    --sidebar-background: 25 20% 10%;
+    --sidebar-foreground: 40 25% 90%;
+    --sidebar-primary: 16 50% 60%;
+    --sidebar-primary-foreground: 25 25% 10%;
+    --sidebar-accent: 25 15% 18%;
+    --sidebar-accent-foreground: 40 25% 90%;
+    --sidebar-border: 25 15% 20%;
+    --sidebar-ring: 16 50% 60%;
   }
 }
 
@@ -98,8 +148,202 @@ All colors MUST be HSL.
   * {
     @apply border-border;
   }
-
+  
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: 'DM Sans', system-ui, sans-serif;
   }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  .text-gradient-warm {
+    background: var(--gradient-warm);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .bg-gradient-warm {
+    background: var(--gradient-warm);
+  }
+  
+  .bg-gradient-sage {
+    background: var(--gradient-sage);
+  }
+  
+  .bg-gradient-sunset {
+    background: var(--gradient-sunset);
+  }
+  
+  .bg-gradient-hero {
+    background: var(--gradient-hero);
+  }
+  
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+  
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+  
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+  
+  /* Chat bubbles */
+  .chat-bubble-user {
+    @apply bg-primary text-primary-foreground rounded-2xl rounded-br-md;
+  }
+  
+  .chat-bubble-assistant {
+    @apply bg-card border border-border rounded-2xl rounded-bl-md;
+  }
+  
+  /* Cards */
+  .therapy-card {
+    @apply bg-card border border-border rounded-xl p-6 shadow-card transition-all duration-300;
+  }
+  
+  .therapy-card:hover {
+    @apply shadow-elevated;
+    transform: translateY(-2px);
+  }
+  
+  /* Emotion badges */
+  .emotion-badge {
+    @apply px-3 py-1 rounded-full text-sm font-medium;
+  }
+  
+  .emotion-anxiety {
+    background: hsl(var(--emotion-anxiety) / 0.15);
+    color: hsl(var(--emotion-anxiety));
+  }
+  
+  .emotion-sadness {
+    background: hsl(var(--emotion-sadness) / 0.15);
+    color: hsl(var(--emotion-sadness));
+  }
+  
+  .emotion-anger {
+    background: hsl(var(--emotion-anger) / 0.15);
+    color: hsl(var(--emotion-anger));
+  }
+  
+  .emotion-stability {
+    background: hsl(var(--emotion-stability) / 0.15);
+    color: hsl(var(--emotion-stability));
+  }
+  
+  .emotion-joy {
+    background: hsl(var(--emotion-joy) / 0.15);
+    color: hsl(var(--emotion-joy));
+  }
+  
+  /* Progress bars */
+  .progress-track {
+    @apply h-2 rounded-full overflow-hidden;
+    background: hsl(var(--muted));
+  }
+  
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-500 ease-out;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.5s ease-out forwards;
+  }
+  
+  .animate-scale-in {
+    animation: scaleIn 0.3s ease-out forwards;
+  }
+  
+  .animate-pulse-soft {
+    animation: pulseSoft 2s ease-in-out infinite;
+  }
+  
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  
+  .animate-typing {
+    animation: typing 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0; 
+    transform: translateY(20px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+@keyframes scaleIn {
+  from { 
+    opacity: 0; 
+    transform: scale(0.95); 
+  }
+  to { 
+    opacity: 1; 
+    transform: scale(1); 
+  }
+}
+
+@keyframes pulseSoft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes typing {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
 }
