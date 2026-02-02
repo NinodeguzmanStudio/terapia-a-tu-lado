@@ -1,8 +1,8 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 const THERAPIST_SYSTEM_PROMPT = `Eres "Terapia a Tu Lado", una guía serena, humana y profunda.
@@ -74,26 +74,48 @@ Si el mensaje es incoherente, burlón, insultante o sin intención real, respond
 **OBJETIVO:**
 Calma, claridad, acompañamiento real y retención consciente.`;
 
-serve(async (req) => {
+interface Message {
+  role: string;
+  content: string;
+}
+
+interface GeminiContent {
+  parts: Array<{ text: string }>;
+  role: string;
+}
+
+interface GeminiRequest {
+  contents: GeminiContent[];
+  generationConfig?: {
+    temperature?: number;
+    maxOutputTokens?: number;
+  };
+  systemInstruction?: {
+    parts: Array<{ text: string }>;
+  };
+}
+
+Deno.serve(async (req: Request) => {
+  // Handle CORS
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const { messages, type = "chat", userContext = "", totalConversations = 0 } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
+
+    if (!GOOGLE_AI_API_KEY) {
+      throw new Error("GOOGLE_AI_API_KEY is not configured");
     }
 
     let systemPrompt = THERAPIST_SYSTEM_PROMPT;
-    
+
     // Add user context if available
     if (userContext) {
       systemPrompt = `${userContext}\n\n${systemPrompt}`;
     }
-    
+
     // Add conversation count context
     if (totalConversations >= 6) {
       systemPrompt += `\n\n[IMPORTANTE: Este usuario ha tenido ${totalConversations} conversaciones. En algún momento de tu respuesta, invítale suavemente a revisar "Mi Progreso" para ver su crecimiento y refuerza que la transformación real viene de la acción, no solo de conversar. Hazlo de forma empática, no imperativa.]`;
@@ -146,65 +168,133 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown):
 }`;
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Convert messages to Gemini format
+    const geminiContents: GeminiContent[] = messages.map((msg: Message) => ({
+      role: msg.role === "assistant" ? "model" : "user",
+      parts: [{ text: msg.content }],
+    }));
+
+    const geminiRequest: GeminiRequest = {
+      contents: geminiContents,
+      systemInstruction: {
+        parts: [{ text: systemPrompt }],
+      },
+      generationConfig: {
+        temperature: type === "chat" ? 0.8 : 0.3,
+        maxOutputTokens: type === "chat" ? 500 : 1000,
+      },
+    };
+
+    // Use streaming for chat, non-streaming for analysis
+    const streamParam = type === "chat" ? "streamGenerateContent" : "generateContent";
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:${streamParam}?alt=sse&key=${GOOGLE_AI_API_KEY}`;
+
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
-        stream: type === "chat",
-        max_tokens: type === "chat" ? 500 : 1000,
-        temperature: type === "chat" ? 0.8 : 0.3,
-      }),
+      body: JSON.stringify(geminiRequest),
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Gemini API error:", response.status, errorText);
+
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Límite de uso alcanzado. Por favor, espera un momento." }), {
           status: 429,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos agotados. Contacta al soporte." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
+
       return new Response(JSON.stringify({ error: "Error al conectar con el terapeuta" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // For streaming (chat), return the stream directly
+    // For streaming (chat), transform SSE format to OpenAI-compatible format
     if (type === "chat") {
-      return new Response(response.body, {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      const { readable, writable } = new TransformStream();
+      const writer = writable.getWriter();
+      const encoder = new TextEncoder();
+
+      // Process Gemini SSE stream
+      (async () => {
+        try {
+          const reader = response.body!.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6);
+                if (data === "[DONE]") continue;
+
+                try {
+                  const parsed = JSON.parse(data);
+                  const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                  if (text) {
+                    // Convert to OpenAI format
+                    const chunk = {
+                      choices: [{
+                        delta: { content: text },
+                        index: 0,
+                      }],
+                    };
+                    await writer.write(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+                  }
+                } catch (e) {
+                  console.error("Error parsing SSE:", e);
+                }
+              }
+            }
+          }
+
+          await writer.write(encoder.encode("data: [DONE]\n\n"));
+          await writer.close();
+        } catch (error) {
+          console.error("Stream error:", error);
+          await writer.abort(error);
+        }
+      })();
+
+      return new Response(readable, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
       });
     }
 
     // For analysis, return JSON
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "";
-    
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
     return new Response(JSON.stringify({ result: content }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (error) {
     console.error("Therapy chat error:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Error desconocido" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : "Error desconocido" }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
 });
