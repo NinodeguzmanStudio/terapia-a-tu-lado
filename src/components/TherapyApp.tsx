@@ -61,18 +61,18 @@ export function TherapyApp() {
   const [conversationsToday, setConversationsToday] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
   const [totalConversations, setTotalConversations] = useState(0);
-  
+
   // User profile
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  
+
   // Analysis states
   const [emotionData, setEmotionData] = useState<EmotionData | null>(null);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -89,20 +89,20 @@ export function TherapyApp() {
     const loadUserData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      
+
       setUserId(user.id);
-      
+
       // Load profile
       const { data: profile } = await supabase
         .from("profiles")
         .select("name, age, is_moderator, streak_days, total_sessions")
         .eq("user_id", user.id)
         .single();
-      
+
       if (profile) {
         setUserProfile(profile);
       }
-      
+
       // Load today's messages
       const today = new Date().toISOString().split('T')[0];
       const { data: chatMessages } = await supabase
@@ -111,27 +111,27 @@ export function TherapyApp() {
         .eq("user_id", user.id)
         .eq("session_date", today)
         .order("created_at", { ascending: true });
-      
+
       if (chatMessages && chatMessages.length > 0) {
         setMessages(chatMessages.map(m => ({
           id: m.id,
           role: m.role as "user" | "assistant",
           content: m.content,
         })));
-        
+
         // Count user messages for conversation tracking
         const userMsgCount = chatMessages.filter(m => m.role === "user").length;
         setMessageCount(userMsgCount);
         setConversationsToday(Math.min(Math.floor(userMsgCount / 3), 3));
       }
-      
+
       // Load suggestions
       const { data: savedSuggestions } = await supabase
         .from("daily_suggestions")
         .select("*")
         .eq("user_id", user.id)
         .gte("created_at", today);
-      
+
       if (savedSuggestions && savedSuggestions.length > 0) {
         setSuggestions(savedSuggestions.map(s => ({
           id: s.id,
@@ -143,19 +143,19 @@ export function TherapyApp() {
           confirmed: s.confirmed || false,
         })));
       }
-      
+
       // Count total conversations for action vs chat logic
       const { count } = await supabase
         .from("chat_messages")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id)
         .eq("role", "user");
-      
+
       setTotalConversations(count || 0);
-      
+
       setIsLoadingHistory(false);
     };
-    
+
     loadUserData();
   }, []);
 
@@ -168,7 +168,7 @@ export function TherapyApp() {
 
   const runFullAnalysis = async () => {
     if (messages.length < 3) return;
-    
+
     setIsAnalyzing(true);
     const chatHistory = messages.map((m) => ({
       role: m.role,
@@ -217,9 +217,9 @@ export function TherapyApp() {
               isCompleted: false,
               confirmed: false,
             }));
-            
+
             setSuggestions(newSuggestions);
-            
+
             // Save to database
             for (const s of newSuggestions) {
               await supabase.from("daily_suggestions").insert({
@@ -245,7 +245,7 @@ export function TherapyApp() {
 
   const saveMessage = async (message: Message) => {
     if (!userId) return;
-    
+
     await supabase.from("chat_messages").insert({
       id: message.id,
       user_id: userId,
@@ -279,11 +279,14 @@ export function TherapyApp() {
       role: m.role,
       content: m.content,
     }));
-    
+
     // Add user context as system context
-    const userContext = userProfile?.name 
+    const userContext = userProfile?.name
       ? `[Contexto: El usuario se llama ${userProfile.name}${userProfile.age ? `, tiene ${userProfile.age} años` : ''}. Total de conversaciones previas: ${totalConversations}]`
       : '';
+
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
     try {
       const response = await fetch(
@@ -292,10 +295,10 @@ export function TherapyApp() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ 
-            messages: chatHistory, 
+          body: JSON.stringify({
+            messages: chatHistory,
             type: "chat",
             userContext,
             totalConversations,
@@ -369,7 +372,7 @@ export function TherapyApp() {
       setIsStreaming(false);
       setMessageCount((prev) => prev + 1);
       setTotalConversations((prev) => prev + 1);
-      
+
       if (messageCount === 0) {
         setConversationsToday((prev) => prev + 1);
       }
@@ -388,7 +391,7 @@ export function TherapyApp() {
   const handleSuggestionToggle = async (id: string, requireNote: boolean = true) => {
     const suggestion = suggestions.find(s => s.id === id);
     if (!suggestion) return;
-    
+
     // If marking as complete and no note exists, require confirmation
     if (!suggestion.isCompleted && requireNote && !suggestion.notes) {
       toast({
@@ -397,27 +400,27 @@ export function TherapyApp() {
       });
       return;
     }
-    
+
     const isConfirmed = !suggestion.isCompleted && suggestion.notes && suggestion.notes.trim().length > 0;
-    
+
     setSuggestions((prev) =>
       prev.map((s) =>
         s.id === id
-          ? { 
-              ...s, 
-              isCompleted: !s.isCompleted, 
-              completedAt: !s.isCompleted ? new Date() : undefined,
-              confirmed: isConfirmed,
-            }
+          ? {
+            ...s,
+            isCompleted: !s.isCompleted,
+            completedAt: !s.isCompleted ? new Date() : undefined,
+            confirmed: isConfirmed,
+          }
           : s
       )
     );
-    
+
     // Update in database
     if (userId) {
       await supabase
         .from("daily_suggestions")
-        .update({ 
+        .update({
           is_completed: !suggestion.isCompleted,
           completed_at: !suggestion.isCompleted ? new Date().toISOString() : null,
           confirmed: isConfirmed,
@@ -430,7 +433,7 @@ export function TherapyApp() {
     setSuggestions((prev) =>
       prev.map((s) => (s.id === id ? { ...s, notes: note } : s))
     );
-    
+
     if (userId) {
       await supabase
         .from("daily_suggestions")
@@ -441,19 +444,19 @@ export function TherapyApp() {
 
   const handleResetChat = async () => {
     if (!userId || !userProfile?.is_moderator) return;
-    
+
     // Delete all messages for this user
     await supabase
       .from("chat_messages")
       .delete()
       .eq("user_id", userId);
-    
+
     // Delete all suggestions
     await supabase
       .from("daily_suggestions")
       .delete()
       .eq("user_id", userId);
-    
+
     // Reset local state
     setMessages([]);
     setSuggestions([]);
@@ -461,7 +464,7 @@ export function TherapyApp() {
     setConversationsToday(0);
     setEmotionData(null);
     setAnalysisData(null);
-    
+
     toast({
       title: "Chat reiniciado",
       description: "El historial ha sido borrado para pruebas.",
@@ -473,8 +476,8 @@ export function TherapyApp() {
   };
 
   const confirmedSuggestions = suggestions.filter(s => s.confirmed).length;
-  const welcomeMessage = userProfile?.name 
-    ? `Hola, ${userProfile.name}. ` 
+  const welcomeMessage = userProfile?.name
+    ? `Hola, ${userProfile.name}. `
     : "";
 
   return (
@@ -577,7 +580,7 @@ export function TherapyApp() {
                 <LogOut className="h-4 w-4 mr-2" />
                 Cerrar sesión
               </Button>
-              
+
               {/* Moderator reset option - only visible for moderators */}
               {userProfile?.is_moderator && (
                 <Button
@@ -658,7 +661,7 @@ export function TherapyApp() {
                         isStreaming={isStreaming && message.id === messages[messages.length - 1]?.id && message.role === "assistant"}
                       />
                     ))}
-                    
+
                     {/* Gentle nudge after 6+ conversations */}
                     {totalConversations >= 6 && messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && (
                       <motion.div
@@ -667,8 +670,8 @@ export function TherapyApp() {
                         className="mt-4 p-4 bg-sage-light/30 rounded-xl text-center"
                       >
                         <p className="text-sm text-muted-foreground">
-                          💫 Has tenido varias conversaciones profundas. 
-                          <button 
+                          💫 Has tenido varias conversaciones profundas.
+                          <button
                             onClick={() => setActiveTab("stats")}
                             className="text-primary hover:underline ml-1"
                           >
