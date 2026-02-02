@@ -288,6 +288,14 @@ export function TherapyApp() {
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const pubKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+    console.log("Diagnostic - Env Check:", {
+      urlExists: !!supabaseUrl,
+      keyExists: !!pubKey,
+      tokenType: session?.access_token ? "session" : "anon_key",
+      urlHeader: supabaseUrl ? `${supabaseUrl.substring(0, 15)}...` : "missing"
+    });
 
     console.log("Calling therapy-chat function...");
 
