@@ -322,7 +322,10 @@ export function TherapyApp() {
       if (!response.ok) {
         const errorData = await response.json();
         console.error("Function Error Full Object:", errorData);
-        throw new Error(errorData.error || "Error al conectar");
+        const detailMessage = typeof errorData.detail === 'string'
+          ? errorData.detail
+          : JSON.stringify(errorData.detail);
+        throw new Error(`${errorData.error || "Error"}: ${detailMessage || ""}`);
       }
 
       const reader = response.body?.getReader();
