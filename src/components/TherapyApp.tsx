@@ -321,6 +321,7 @@ export function TherapyApp() {
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error("Function Error Full Object:", errorData);
         throw new Error(errorData.error || "Error al conectar");
       }
 
