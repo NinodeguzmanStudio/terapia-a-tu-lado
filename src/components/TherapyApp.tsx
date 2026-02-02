@@ -296,6 +296,8 @@ export function TherapyApp() {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            "x-client-info": "supabase-js-antigravity",
           },
           body: JSON.stringify({
             messages: chatHistory,
