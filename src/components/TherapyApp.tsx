@@ -12,7 +12,7 @@ export function TherapyApp() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"chat" | "stats">("chat");
 
-  const { userProfile, userId, handleLogout } = useUserProfile();
+  const { userProfile, userId, activeDates, handleLogout } = useUserProfile();
   const {
     messages,
     isLoading,
@@ -107,6 +107,7 @@ export function TherapyApp() {
             analysisData={analysisData}
             suggestions={suggestions}
             isAnalyzing={isAnalyzing}
+            activeDates={activeDates}
             confirmedSuggestions={confirmedSuggestions}
             handleSuggestionToggle={handleSuggestionToggle}
             handleAddNote={handleAddNote}

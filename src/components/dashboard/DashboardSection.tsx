@@ -3,6 +3,8 @@ import { PlantProgress } from "@/components/dashboard/PlantProgress";
 import { EmotionStats } from "@/components/dashboard/EmotionStats";
 import { PatternAnalysis } from "@/components/dashboard/PatternAnalysis";
 import { DailySuggestions } from "@/components/dashboard/DailySuggestions";
+import { StreakCalendar } from "@/components/dashboard/StreakCalendar";
+import { StreakRewards } from "@/components/dashboard/StreakRewards";
 import { UserProfile, EmotionData, AnalysisData, Suggestion } from "@/types/therapy";
 
 interface DashboardSectionProps {
@@ -11,6 +13,7 @@ interface DashboardSectionProps {
     analysisData: AnalysisData | null;
     suggestions: Suggestion[];
     isAnalyzing: boolean;
+    activeDates: Date[];
     confirmedSuggestions: number;
     handleSuggestionToggle: (id: string, requireNote?: boolean) => void;
     handleAddNote: (id: string, note: string) => void;
@@ -22,6 +25,7 @@ export function DashboardSection({
     analysisData,
     suggestions,
     isAnalyzing,
+    activeDates,
     confirmedSuggestions,
     handleSuggestionToggle,
     handleAddNote,
@@ -48,6 +52,8 @@ export function DashboardSection({
                         totalSessions={userProfile?.total_sessions || 0}
                         isLoading={false}
                     />
+                    <StreakRewards currentStreak={userProfile?.streak_days || 0} />
+                    <StreakCalendar activeDates={activeDates} />
                     <EmotionStats data={emotionData} isLoading={isAnalyzing} />
                     <PatternAnalysis data={analysisData} isLoading={isAnalyzing} />
                     <DailySuggestions
