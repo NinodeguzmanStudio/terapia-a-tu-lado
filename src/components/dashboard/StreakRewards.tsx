@@ -1,12 +1,12 @@
 import { motion } from "framer-motion";
-import { Award, Lock, CheckCircle2, Flame, Star, Crown } from "lucide-react";
+import { Award, Lock, CheckCircle2, Flame, Star, Crown, LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Milestone {
     days: number;
     label: string;
     description: string;
-    icon: any;
+    icon: LucideIcon;
     color: string;
 }
 

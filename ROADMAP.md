@@ -70,9 +70,7 @@ Este documento describe el progreso actual y la visión futura del proyecto **Te
   - Toggle de tema en configuración
   - Ajustar gradientes para dark mode
 
-- [ ] **Mejora del sistema de rachas**
-  - Notificaciones para mantener racha
-  - Recompensas por rachas largas (7, 14, 30 días)
+- [x] 📅 Mejora del sistema de rachas: Implementar un calendario visual de progreso y recompensas por rachas largas (7, 14, 30 días)
   - Visualización de calendario de rachas
 
 - [ ] **Exportación de datos**
