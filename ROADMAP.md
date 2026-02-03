@@ -65,7 +65,7 @@ Este documento describe el progreso actual y la visión futura del proyecto **Te
 ### Fase 1: Mejoras Core (Próximos 1-2 meses)
 
 #### Prioridad Alta 🔴
-- [ ] **Modo oscuro completo**
+- [x] **Modo oscuro completo**
   - Implementar tema oscuro con next-themes
   - Toggle de tema en configuración
   - Ajustar gradientes para dark mode
