@@ -7,6 +7,8 @@ export function useUserProfile() {
     const [userId, setUserId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
+    const [activeDates, setActiveDates] = useState<Date[]>([]);
+
     useEffect(() => {
         const loadProfile = async () => {
             setIsLoading(true);
@@ -27,6 +29,20 @@ export function useUserProfile() {
             if (profile) {
                 setUserProfile(profile);
             }
+
+            // Fetch active dates for calendar
+            const { data: messages } = await supabase
+                .from("chat_messages")
+                .select("session_date")
+                .eq("user_id", user.id)
+                .eq("role", "user");
+
+            if (messages) {
+                const uniqueDates = Array.from(new Set(messages.map(m => m.session_date)))
+                    .map(dateStr => new Date(dateStr));
+                setActiveDates(uniqueDates);
+            }
+
             setIsLoading(false);
         };
 
@@ -40,6 +56,7 @@ export function useUserProfile() {
     return {
         userProfile,
         userId,
+        activeDates,
         isLoading,
         handleLogout,
     };
