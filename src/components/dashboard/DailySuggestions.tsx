@@ -94,10 +94,10 @@ export function DailySuggestions({ suggestions, onToggle, onAddNote, isLoading }
               className={cn(
                 "border rounded-xl transition-all overflow-hidden",
                 suggestion.isCompleted && suggestion.confirmed
-                  ? "bg-sage-light/50 border-sage/50"
+                  ? "bg-[hsl(var(--suggestion-confirmed))] border-[hsl(var(--suggestion-confirmed)/0.5)]"
                   : suggestion.isCompleted
-                  ? "bg-sand/30 border-sand"
-                  : "bg-background border-border hover:border-primary/30"
+                    ? "bg-[hsl(var(--suggestion-completed))] border-[hsl(var(--suggestion-completed)/0.5)]"
+                    : "bg-background border-border hover:border-primary/30"
               )}
             >
               <div className="flex items-start gap-3 p-4">
@@ -159,7 +159,7 @@ export function DailySuggestions({ suggestions, onToggle, onAddNote, isLoading }
                   >
                     <div className="pt-3">
                       <p className="text-xs text-muted-foreground mb-2">
-                        {suggestion.isCompleted 
+                        {suggestion.isCompleted
                           ? "Nota sobre tu experiencia:"
                           : "Añade una nota para poder marcar como completada:"}
                       </p>
