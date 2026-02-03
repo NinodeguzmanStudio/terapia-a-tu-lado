@@ -11,8 +11,8 @@ interface ProfileSettingsProps {
     isOpen: boolean;
     onClose: () => void;
     userProfile: UserProfile | null;
-    onUpdate: (updates: { name: string; age: number }) => Promise<any>;
-    onDelete: () => Promise<any>;
+    onUpdate: (updates: { name: string; age: number }) => Promise<{ error: any }>;
+    onDelete: () => Promise<{ error: any }>;
 }
 
 export function ProfileSettings({
