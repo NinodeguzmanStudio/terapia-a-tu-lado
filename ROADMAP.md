@@ -89,7 +89,7 @@ Este documento describe el progreso actual y la visión futura del proyecto **Te
   - Explicación de cómo funciona el análisis
   - Tips sobre cómo usar mejor la app
 
-- [ ] **Configuración de usuario**
+- [x] **Configuración de usuario**
   - Editar perfil (nombre, edad)
   - Preferencias de notificaciones
   - Configuración de privacidad

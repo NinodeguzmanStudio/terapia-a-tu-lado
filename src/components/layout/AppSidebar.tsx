@@ -25,8 +25,8 @@ interface AppSidebarProps {
     setTheme: (theme: string) => void;
     handleLogout: () => void;
     handleResetChat: () => void;
-    updateProfile: (updates: { name?: string; age?: number }) => Promise<any>;
-    deleteAccount: () => Promise<any>;
+    updateProfile: (updates: { name?: string; age?: number }) => Promise<{ error: any }>;
+    deleteAccount: () => Promise<{ error: any }>;
 }
 
 export function AppSidebar({
