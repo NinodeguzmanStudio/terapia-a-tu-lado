@@ -1,6 +1,6 @@
 # 🌿 Terapia a Tu Lado
 
-**Tu espacio de bienestar emocional con inteligencia artificial**
+**Tu espacio de bienestar emocional profunda**
 
 Terapia a Tu Lado es una aplicación web de acompañamiento terapéutico que utiliza IA para brindar apoyo emocional personalizado, análisis de patrones emocionales y sugerencias diarias para tu crecimiento personal.
 
@@ -243,7 +243,7 @@ Este proyecto es de uso personal y educativo.
 
 - Diseñado con amor para apoyar el bienestar emocional
 - Construido con las mejores prácticas de desarrollo web moderno
-- Inspirado en la importancia de la salud mental accesible
+- Inspirado en la importancia de la salud mental y emocional accesible
 
 ---
 

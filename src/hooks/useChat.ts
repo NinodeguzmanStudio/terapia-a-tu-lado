@@ -1,0 +1,215 @@
+import { useState, useCallback, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Message, UserProfile } from "@/types/therapy";
+import { useToast } from "@/hooks/use-toast";
+
+export function useChat(userId: string | null, userProfile: UserProfile | null) {
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isStreaming, setIsStreaming] = useState(false);
+    const [conversationsToday, setConversationsToday] = useState(0);
+    const [messageCount, setMessageCount] = useState(0);
+    const [totalConversations, setTotalConversations] = useState(0);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+
+    const { toast } = useToast();
+
+    const saveMessage = useCallback(async (message: Message) => {
+        if (!userId) return;
+
+        await supabase.from("chat_messages").insert({
+            id: message.id,
+            user_id: userId,
+            content: message.content,
+            role: message.role,
+        });
+    }, [userId]);
+
+    const loadChatHistory = useCallback(async (uid: string) => {
+        setIsLoadingHistory(true);
+        const today = new Date().toISOString().split('T')[0];
+
+        // Load today's messages
+        const { data: chatMessages } = await supabase
+            .from("chat_messages")
+            .select("*")
+            .eq("user_id", uid)
+            .eq("session_date", today)
+            .order("created_at", { ascending: true });
+
+        if (chatMessages && chatMessages.length > 0) {
+            setMessages(chatMessages.map(m => ({
+                id: m.id,
+                role: m.role as "user" | "assistant",
+                content: m.content,
+            })));
+
+            const userMsgCount = chatMessages.filter(m => m.role === "user").length;
+            setMessageCount(userMsgCount);
+            setConversationsToday(Math.min(Math.floor(userMsgCount / 3), 3));
+        }
+
+        // Count total conversations
+        const { count } = await supabase
+            .from("chat_messages")
+            .select("*", { count: "exact", head: true })
+            .eq("user_id", uid)
+            .eq("role", "user");
+
+        setTotalConversations(count || 0);
+        setIsLoadingHistory(false);
+    }, []);
+
+    const sendMessage = useCallback(async (content: string) => {
+        if (conversationsToday >= 3) {
+            toast({
+                title: "Límite diario alcanzado",
+                description: "Has llegado a tu límite de 3 conversaciones hoy. Vuelve mañana para continuar.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        const userMessage: Message = {
+            id: `user-${Date.now()}`,
+            role: "user",
+            content,
+        };
+
+        setMessages((prev) => [...prev, userMessage]);
+        await saveMessage(userMessage);
+        setIsLoading(true);
+
+        const chatHistory = [...messages, userMessage].map((m) => ({
+            role: m.role,
+            content: m.content,
+        }));
+
+        const userContext = userProfile?.name
+            ? `[Contexto: El usuario se llama ${userProfile.name}${userProfile.age ? `, tiene ${userProfile.age} años` : ''}. Total de conversaciones previas: ${totalConversations}]`
+            : '';
+
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+        try {
+            const response = await fetch(
+                `${supabaseUrl}/functions/v1/therapy-chat`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`,
+                        "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+                        "x-client-info": "supabase-js-antigravity",
+                    },
+                    body: JSON.stringify({
+                        messages: chatHistory,
+                        type: "chat",
+                        userContext,
+                        totalConversations,
+                    }),
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`${errorData.error || "Error"}: ${JSON.stringify(errorData.detail) || ""}`);
+            }
+
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error("No se pudo iniciar la lectura");
+
+            setIsLoading(false);
+            setIsStreaming(true);
+
+            let assistantContent = "";
+            const decoder = new TextDecoder();
+            let buffer = "";
+
+            const assistantMessage: Message = {
+                id: `assistant-${Date.now()}`,
+                role: "assistant",
+                content: "",
+            };
+            setMessages((prev) => [...prev, assistantMessage]);
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                let newlineIndex: number;
+                while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+                    let line = buffer.slice(0, newlineIndex);
+                    buffer = buffer.slice(newlineIndex + 1);
+
+                    if (line.endsWith("\r")) line = line.slice(0, -1);
+                    if (line.startsWith(":") || line.trim() === "") continue;
+                    if (!line.startsWith("data: ")) continue;
+
+                    const jsonStr = line.slice(6).trim();
+                    if (jsonStr === "[DONE]") break;
+
+                    try {
+                        const parsed = JSON.parse(jsonStr);
+                        const content = parsed.choices?.[0]?.delta?.content;
+                        if (content) {
+                            assistantContent += content;
+                            setMessages((prev) =>
+                                prev.map((m) =>
+                                    m.id === assistantMessage.id
+                                        ? { ...m, content: assistantContent }
+                                        : m
+                                )
+                            );
+                        }
+                    } catch {
+                        buffer = line + "\n" + buffer;
+                        break;
+                    }
+                }
+            }
+
+            await saveMessage({ ...assistantMessage, content: assistantContent });
+            setIsStreaming(false);
+            setMessageCount((prev) => prev + 1);
+            setTotalConversations((prev) => prev + 1);
+
+            if (messageCount === 0) {
+                setConversationsToday((prev) => prev + 1);
+            }
+        } catch (error) {
+            console.error("Chat error:", error);
+            setIsLoading(false);
+            setIsStreaming(false);
+            toast({
+                title: "Error de conexión",
+                description: error instanceof Error ? error.message : "No se pudo enviar el mensaje",
+                variant: "destructive",
+            });
+        }
+    }, [messages, conversationsToday, messageCount, toast, userId, userProfile, totalConversations, saveMessage]);
+
+    const resetChat = useCallback(async () => {
+        if (!userId) return;
+        await supabase.from("chat_messages").delete().eq("user_id", userId);
+        setMessages([]);
+        setMessageCount(0);
+        setConversationsToday(0);
+    }, [userId]);
+
+    return {
+        messages,
+        isLoading,
+        isStreaming,
+        conversationsToday,
+        messageCount,
+        totalConversations,
+        isLoadingHistory,
+        sendMessage,
+        loadChatHistory,
+        resetChat,
+    };
+}
