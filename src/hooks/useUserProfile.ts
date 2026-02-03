@@ -49,6 +49,38 @@ export function useUserProfile() {
         loadProfile();
     }, []);
 
+    const updateProfile = async (updates: { name?: string; age?: number }) => {
+        if (!userId) return;
+        const { error } = await supabase
+            .from("profiles")
+            .update(updates)
+            .eq("user_id", userId);
+
+        if (!error) {
+            setUserProfile(prev => prev ? { ...prev, ...updates } : null);
+        }
+        return { error };
+    };
+
+    const deleteAccount = async () => {
+        if (!userId) return;
+
+        // Profiles are linked to user_id, so cascading delete or manual cleanup might be needed.
+        // For simplicity, we trigger the delete and sign out.
+        const { error: profileError } = await supabase
+            .from("profiles")
+            .delete()
+            .eq("user_id", userId);
+
+        if (profileError) return { error: profileError };
+
+        const { error: authError } = await supabase.rpc('delete_user');
+        // Note: deleting a user often requires a service role or a specific function.
+        // If not available, we at least sign out.
+        await supabase.auth.signOut();
+        return { error: authError };
+    };
+
     const handleLogout = async () => {
         await supabase.auth.signOut();
     };
@@ -58,6 +90,8 @@ export function useUserProfile() {
         userId,
         activeDates,
         isLoading,
+        updateProfile,
+        deleteAccount,
         handleLogout,
     };
 }
