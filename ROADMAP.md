@@ -213,7 +213,7 @@ Este documento describe el progreso actual y la visión futura del proyecto **Te
 - [ ] Aumentar cobertura de tests a >80%
 - [ ] Implementar E2E tests con Playwright
 - [ ] Mejorar documentación de código
-- [ ] Refactorizar `TherapyApp.tsx` (muy largo)
+- [x] Refactorizar `TherapyApp.tsx` (muy largo)
 
 ### DevOps
 - [ ] CI/CD pipeline con GitHub Actions
@@ -255,7 +255,7 @@ Este documento describe el progreso actual y la visión futura del proyecto **Te
 - [ ] Edge case: si el usuario tiene >100 mensajes, la UI puede ser lenta
 
 ### Tech Debt
-- [ ] `TherapyApp.tsx` es muy grande (742 líneas → separar en hooks)
+- [x] `TherapyApp.tsx` es muy grande (742 líneas → separar en hooks)
 - [ ] Mejorar manejo de errores en Edge Functions
 - [ ] Centralizar constantes mágicas (ej: límite de 3 conversaciones)
 - [ ] Tipado más estricto en algunas interfaces

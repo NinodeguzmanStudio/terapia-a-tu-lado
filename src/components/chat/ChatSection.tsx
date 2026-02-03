@@ -64,20 +64,22 @@ export function ChatSection({
                             </div>
                         </div>
                     ) : messages.length === 0 ? (
-                        <div className="text-center py-12">
+                        <div className="text-center py-20 lg:py-32">
                             <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.5 }}
                                 className="inline-flex flex-col items-center"
                             >
-                                <div className="w-20 h-20 rounded-full bg-gradient-warm flex items-center justify-center mb-6 shadow-glow">
-                                    <Sparkles className="h-10 w-10 text-white" />
+                                <div className="w-24 h-24 rounded-full bg-gradient-warm flex items-center justify-center mb-8 shadow-glow animate-pulse-soft">
+                                    <Sparkles className="h-12 w-12 text-white" />
                                 </div>
-                                <h3 className="text-2xl font-serif mb-2">
-                                    {welcomeMessage}Bienvenido
+                                <h3 className="text-3xl font-serif mb-4 text-foreground">
+                                    {welcomeMessage.trim() || "Bienvenido/a"}
                                 </h3>
-                                <p className="text-muted-foreground max-w-sm">
-                                    Este es tu espacio seguro. Cuéntame, ¿cómo te sientes hoy?
+                                <div className="h-px w-12 bg-primary/30 mb-6" />
+                                <p className="text-muted-foreground max-w-sm leading-relaxed text-balance">
+                                    Este es tu espacio seguro y privado. Cuéntame, ¿qué tienes en mente hoy?
                                 </p>
                             </motion.div>
                         </div>

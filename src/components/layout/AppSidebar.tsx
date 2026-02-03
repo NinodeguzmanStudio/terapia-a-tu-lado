@@ -3,6 +3,14 @@ import { Menu, X, BarChart2, MessageCircle, LogOut, RotateCcw, Settings, Moon, S
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { UserProfile } from "@/types/therapy";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface AppSidebarProps {
     sidebarOpen: boolean;
@@ -114,52 +122,58 @@ export function AppSidebar({
                             </div>
                         </div>
 
-                        <div className="p-4 border-t border-sidebar-border">
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-sm font-medium text-sidebar-foreground flex items-center gap-2">
-                                    <Settings className="h-4 w-4" />
-                                    Configuración
-                                </h3>
-                            </div>
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm text-muted-foreground">Tema</span>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                                        className="h-8 w-8 p-0"
-                                    >
-                                        {theme === "dark" ? (
-                                            <Sun className="h-4 w-4" />
-                                        ) : (
-                                            <Moon className="h-4 w-4" />
-                                        )}
-                                    </Button>
+                        <div className="mt-auto p-4 border-t border-sidebar-border flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center text-sidebar-primary font-medium text-xs">
+                                    {userProfile?.name?.[0]?.toUpperCase() || "U"}
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-medium text-sidebar-foreground truncate max-w-[120px]">
+                                        {userProfile?.name || "Usuario"}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground">
+                                        {conversationsToday}/3 conversaciones
+                                    </span>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="p-4 space-y-2">
-                            <Button
-                                variant="ghost"
-                                className="w-full justify-start text-muted-foreground hover:text-foreground"
-                                onClick={handleLogout}
-                            >
-                                <LogOut className="h-4 w-4 mr-2" />
-                                Cerrar sesión
-                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-sidebar-foreground">
+                                        <Settings className="h-5 w-5" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                    <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+                                        {theme === "dark" ? (
+                                            <>
+                                                <Sun className="mr-2 h-4 w-4" />
+                                                <span>Modo Claro</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Moon className="mr-2 h-4 w-4" />
+                                                <span>Modo Oscuro</span>
+                                            </>
+                                        )}
+                                    </DropdownMenuItem>
 
-                            {userProfile?.is_moderator && (
-                                <Button
-                                    variant="ghost"
-                                    className="w-full justify-start text-muted-foreground hover:text-destructive"
-                                    onClick={handleResetChat}
-                                >
-                                    <RotateCcw className="h-4 w-4 mr-2" />
-                                    Reiniciar chat (modo prueba)
-                                </Button>
-                            )}
+                                    {userProfile?.is_moderator && (
+                                        <DropdownMenuItem onClick={handleResetChat}>
+                                            <RotateCcw className="mr-2 h-4 w-4" />
+                                            <span>Reiniciar chat (Debug)</span>
+                                        </DropdownMenuItem>
+                                    )}
+
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+                                        <LogOut className="mr-2 h-4 w-4" />
+                                        <span>Cerrar sesión</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                     </motion.aside>
                 )}
