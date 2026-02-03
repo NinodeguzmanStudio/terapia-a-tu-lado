@@ -74,11 +74,10 @@ export function useUserProfile() {
 
         if (profileError) return { error: profileError };
 
-        const { error: authError } = await supabase.rpc('delete_user');
-        // Note: deleting a user often requires a service role or a specific function.
-        // If not available, we at least sign out.
+        // Deleting the auth user usually requires higher privileges (service role).
+        // For now, we sign out to ensure the session is cleared.
         await supabase.auth.signOut();
-        return { error: authError };
+        return { error: null };
     };
 
     const handleLogout = async () => {

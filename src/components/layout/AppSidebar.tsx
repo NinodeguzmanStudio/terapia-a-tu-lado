@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, BarChart2, MessageCircle, LogOut, RotateCcw, Settings, Moon, Sun } from "lucide-react";
+import { Menu, X, BarChart2, MessageCircle, LogOut, RotateCcw, Settings, Moon, Sun, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { UserProfile } from "@/types/therapy";
+import { ProfileSettings } from "./ProfileSettings";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -23,6 +25,8 @@ interface AppSidebarProps {
     setTheme: (theme: string) => void;
     handleLogout: () => void;
     handleResetChat: () => void;
+    updateProfile: (updates: { name?: string; age?: number }) => Promise<any>;
+    deleteAccount: () => Promise<any>;
 }
 
 export function AppSidebar({
@@ -36,7 +40,10 @@ export function AppSidebar({
     setTheme,
     handleLogout,
     handleResetChat,
+    updateProfile,
+    deleteAccount,
 }: AppSidebarProps) {
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
     return (
         <>
             <button
@@ -146,6 +153,11 @@ export function AppSidebar({
                                 <DropdownMenuContent align="end" className="w-56">
                                     <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
                                     <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
+                                        <User className="mr-2 h-4 w-4" />
+                                        <span>Configuración</span>
+                                    </DropdownMenuItem>
+
                                     <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
                                         {theme === "dark" ? (
                                             <>
@@ -178,6 +190,14 @@ export function AppSidebar({
                     </motion.aside>
                 )}
             </AnimatePresence>
+
+            <ProfileSettings
+                isOpen={isProfileOpen}
+                onClose={() => setIsProfileOpen(false)}
+                userProfile={userProfile}
+                onUpdate={updateProfile}
+                onDelete={deleteAccount}
+            />
 
             {sidebarOpen && (
                 <div

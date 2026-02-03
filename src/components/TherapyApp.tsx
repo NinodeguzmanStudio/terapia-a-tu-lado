@@ -12,7 +12,7 @@ export function TherapyApp() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"chat" | "stats">("chat");
 
-  const { userProfile, userId, activeDates, handleLogout } = useUserProfile();
+  const { userProfile, userId, activeDates, updateProfile, deleteAccount, handleLogout } = useUserProfile();
   const {
     messages,
     isLoading,
@@ -85,6 +85,8 @@ export function TherapyApp() {
         setTheme={setTheme}
         handleLogout={handleLogout}
         handleResetChat={handleResetChat}
+        updateProfile={updateProfile}
+        deleteAccount={deleteAccount}
       />
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
