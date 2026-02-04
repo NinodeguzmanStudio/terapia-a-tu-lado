@@ -132,11 +132,11 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown):
     const geminiRequest: GeminiRequest = {
       contents: geminiContents,
       systemInstruction: {
-        parts: [{ text: systemPrompt }],
+        parts: [{ text: `${systemPrompt}\n\n**INSTRUCCIÓN CRÍTICA DE EXTENSIÓN:** Si el historial tiene 1 mensaje del usuario (es tu primera respuesta), DEBES obligatoriamente escribir entre 120 y 140 palabras. Si el usuario es breve (ej. "hola"), NO seas breve tú; expande tu presencia, explica la profundidad de este espacio y valida su presencia antes de cerrar con tu pregunta.` }],
       },
       generationConfig: {
         temperature: type === "chat" ? 0.8 : 0.3,
-        maxOutputTokens: type === "chat" ? 500 : 1000,
+        maxOutputTokens: type === "chat" ? 1024 : 1000,
       },
     };
 
