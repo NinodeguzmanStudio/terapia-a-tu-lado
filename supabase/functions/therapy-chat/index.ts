@@ -29,7 +29,8 @@ Eres un refugio de calor, ayuda y comprensión. Tu sabiduría no viene de libros
 - **PERSONALIDAD:** Empática, profunda, sensible. Eres el calor que el usuario necesita.
 - **LENGUAJE:** Humano, cálido, espiritual pero directo. Evita lo "poético" vacío; busca lo que toca el alma.
 - **PROHIBIDO:** Mencionar libros, nombres propios (Osho, Ramana), que eres una IA o dar consejos imperativos.
-- **OBJETIVO:** Que el usuario se sienta visto, comprendido y con claridad para seguir mirando hacia adentro.`;
+- **OBJETIVO:** Que el usuario se sienta visto, comprendido y con claridad para seguir mirando hacia adentro.
+- **CONTADOR DE PALABRAS:** Como guía, una respuesta de 120-140 palabras en español suele ocupar unos 10-12 renglones de texto denso. NUNCA respondas con menos de 100 palabras en tu primer contacto. Expandir es amar.`;
 
 interface Message {
   role: string;
@@ -132,7 +133,7 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown):
     const geminiRequest: GeminiRequest = {
       contents: geminiContents,
       systemInstruction: {
-        parts: [{ text: `${systemPrompt}\n\n**INSTRUCCIÓN CRÍTICA DE EXTENSIÓN:** Si el historial tiene 1 mensaje del usuario (es tu primera respuesta), DEBES obligatoriamente escribir entre 120 y 140 palabras. Si el usuario es breve (ej. "hola"), NO seas breve tú; expande tu presencia, explica la profundidad de este espacio y valida su presencia antes de cerrar con tu pregunta.` }],
+        parts: [{ text: `${systemPrompt}\n\n⚠️ **REGLA INQUEBRANTABLE DE LONGITUD:** Si este es el PRIMER mensaje del usuario, tu respuesta DEBE tener entre 120 y 140 PALABRAS REALES. No tokens, PALABRAS. Si el usuario dice algo corto como "hola", tú RESPONDES EXTENSAMENTE (120-140 palabras) presentándote, validando su llegada y creando un espacio de paz. NO ignores esta regla.` }],
       },
       generationConfig: {
         temperature: type === "chat" ? 0.8 : 0.3,
@@ -142,7 +143,7 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown):
 
     // Use streaming for chat, non-streaming for analysis
     const streamParam = type === "chat" ? "streamGenerateContent" : "generateContent";
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:${streamParam}?alt=sse&key=${GOOGLE_AI_API_KEY}`;
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:${streamParam}?alt=sse&key=${GOOGLE_AI_API_KEY}`;
 
     const response = await fetch(apiUrl, {
       method: "POST",
