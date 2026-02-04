@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { EmotionData, AnalysisData, Message, Suggestion } from "@/types/therapy";
 
@@ -79,7 +79,6 @@ export function useAnalysis(userId: string | null) {
                     console.error("Error parsing emotion analysis:", e);
                 }
             }
-            // ... rest of the function remains same, just ensuring persistence.
 
             if (suggestionsResponse.data?.result && userId) {
                 try {

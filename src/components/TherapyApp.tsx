@@ -4,6 +4,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { useChat } from "@/hooks/useChat";
 import { useSuggestions } from "@/hooks/useSuggestions";
 import { useAnalysis } from "@/hooks/useAnalysis";
+import { toast } from "sonner";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { ChatSection } from "@/components/chat/ChatSection";
 import { DashboardSection } from "@/components/dashboard/DashboardSection";
@@ -38,6 +39,7 @@ export function TherapyApp() {
   const {
     emotionData,
     analysisData,
+    historicalAnalysis,
     isAnalyzing,
     runFullAnalysis,
     resetAnalysis,
@@ -56,7 +58,12 @@ export function TherapyApp() {
   // Trigger analysis after message #3
   useEffect(() => {
     if (messageCount === 3 && messages.length >= 3) {
-      runFullAnalysis(messages, setSuggestions);
+      runFullAnalysis(messages, (newSuggestions) => {
+        setSuggestions(newSuggestions);
+        toast.success("¡Análisis completado!", {
+          description: "Hemos actualizado tus estadísticas y sugerencias diarias.",
+        });
+      });
     }
   }, [messageCount, messages.length, messages, runFullAnalysis, setSuggestions]);
 
@@ -68,6 +75,26 @@ export function TherapyApp() {
   };
 
   const confirmedSuggestions = suggestions.filter(s => s.confirmed).length;
+
+  // Celebrate milestones
+  useEffect(() => {
+    if (userProfile?.streak_days) {
+      if (userProfile.streak_days === 7) {
+        toast.success("¡Semana de Constancia!", {
+          description: "Has completado 7 días seguidos cuidando tu bienestar. ⭐",
+        });
+      } else if (userProfile.streak_days === 14) {
+        toast.success("¡Quincena de Bienestar!", {
+          description: "¡14 días de racha! Tu compromiso es admirable. 🔥",
+        });
+      } else if (userProfile.streak_days === 30) {
+        toast.success("¡Mes de Transformación!", {
+          description: "¡30 días! Has creado un hábito poderoso de autocuidado. 👑",
+        });
+      }
+    }
+  }, [userProfile?.streak_days]);
+
   const welcomeMessage = userProfile?.name
     ? `Hola, ${userProfile.name}. `
     : "";
@@ -107,6 +134,7 @@ export function TherapyApp() {
             userProfile={userProfile}
             emotionData={emotionData}
             analysisData={analysisData}
+            historicalAnalysis={historicalAnalysis}
             suggestions={suggestions}
             isAnalyzing={isAnalyzing}
             activeDates={activeDates}

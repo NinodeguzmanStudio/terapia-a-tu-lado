@@ -5,12 +5,14 @@ import { PatternAnalysis } from "@/components/dashboard/PatternAnalysis";
 import { DailySuggestions } from "@/components/dashboard/DailySuggestions";
 import { StreakCalendar } from "@/components/dashboard/StreakCalendar";
 import { StreakRewards } from "@/components/dashboard/StreakRewards";
+import { EmotionTrendChart } from "@/components/dashboard/EmotionTrendChart";
 import { UserProfile, EmotionData, AnalysisData, Suggestion } from "@/types/therapy";
 
 interface DashboardSectionProps {
     userProfile: UserProfile | null;
     emotionData: EmotionData | null;
     analysisData: AnalysisData | null;
+    historicalAnalysis: any[];
     suggestions: Suggestion[];
     isAnalyzing: boolean;
     activeDates: Date[];
@@ -23,6 +25,7 @@ export function DashboardSection({
     userProfile,
     emotionData,
     analysisData,
+    historicalAnalysis,
     suggestions,
     isAnalyzing,
     activeDates,
@@ -55,6 +58,7 @@ export function DashboardSection({
                     <StreakRewards currentStreak={userProfile?.streak_days || 0} />
                     <StreakCalendar activeDates={activeDates} />
                     <EmotionStats data={emotionData} isLoading={isAnalyzing} />
+                    <EmotionTrendChart data={historicalAnalysis} isLoading={isAnalyzing} />
                     <PatternAnalysis data={analysisData} isLoading={isAnalyzing} />
                     <DailySuggestions
                         suggestions={suggestions}
