@@ -17,11 +17,14 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
     const saveMessage = useCallback(async (message: Message) => {
         if (!userId) return;
 
+        const today = new Date().toISOString().split('T')[0];
+
         await supabase.from("chat_messages").insert({
             id: message.id,
             user_id: userId,
             content: message.content,
             role: message.role,
+            session_date: today
         });
     }, [userId]);
 
@@ -71,7 +74,7 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
         }
 
         const userMessage: Message = {
-            id: `user-${Date.now()}`,
+            id: crypto.randomUUID(),
             role: "user",
             content,
         };
@@ -129,7 +132,7 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             let buffer = "";
 
             const assistantMessage: Message = {
-                id: `assistant-${Date.now()}`,
+                id: crypto.randomUUID(),
                 role: "assistant",
                 content: "",
             };

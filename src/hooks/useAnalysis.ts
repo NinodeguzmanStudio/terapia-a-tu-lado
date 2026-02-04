@@ -63,6 +63,7 @@ export function useAnalysis(userId: string | null) {
                     // Save to database for trends
                     await supabase.from("emotional_analysis").insert({
                         user_id: userId,
+                        analysis_date: new Date().toISOString().split('T')[0],
                         anxiety_percentage: newEmotionData.anxiety,
                         anger_percentage: newEmotionData.anger,
                         sadness_percentage: newEmotionData.sadness,
@@ -84,8 +85,8 @@ export function useAnalysis(userId: string | null) {
                 try {
                     const parsed = JSON.parse(suggestionsResponse.data.result);
                     if (parsed.suggestions) {
-                        const newSuggestions: Suggestion[] = parsed.suggestions.map((s: { text: string; category: string }, i: number) => ({
-                            id: `suggestion-${Date.now()}-${i}`,
+                        const newSuggestions: Suggestion[] = parsed.suggestions.map((s: { text: string; category: string }) => ({
+                            id: crypto.randomUUID(),
                             text: s.text,
                             category: s.category,
                             isCompleted: false,
