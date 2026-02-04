@@ -101,12 +101,19 @@ export function DailySuggestions({ suggestions, onToggle, onAddNote, isLoading }
               )}
             >
               <div className="flex items-start gap-3 p-4">
-                <Checkbox
-                  checked={suggestion.isCompleted}
-                  onCheckedChange={() => onToggle(suggestion.id)}
-                  className="mt-0.5"
-                  disabled={!suggestion.notes && !suggestion.isCompleted}
-                />
+                <div className="flex items-center gap-2 mt-0.5">
+                  <button
+                    onClick={() => onToggle(suggestion.id)}
+                    className={cn(
+                      "w-6 h-6 rounded flex items-center justify-center border transition-all",
+                      suggestion.isCompleted
+                        ? "bg-primary border-primary text-white"
+                        : "bg-background border-border hover:border-primary/50"
+                    )}
+                  >
+                    <Check className={cn("h-4 w-4", !suggestion.isCompleted && "opacity-0")} />
+                  </button>
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span>{categoryIcons[suggestion.category] || "✨"}</span>
@@ -175,10 +182,21 @@ export function DailySuggestions({ suggestions, onToggle, onAddNote, isLoading }
                         }}
                         className="min-h-[60px] text-sm bg-background/50"
                       />
-                      {!suggestion.isCompleted && suggestion.notes && (
-                        <p className="text-xs text-primary mt-2">
-                          ✓ Ahora puedes marcar como completada
-                        </p>
+                      {!suggestion.isCompleted && (
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            onClick={() => onToggle(suggestion.id)}
+                            className="bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1 rounded-md text-xs font-medium transition-colors"
+                          >
+                            Sí, lo hice
+                          </button>
+                          <button
+                            onClick={() => setExpandedId(null)}
+                            className="text-muted-foreground hover:text-foreground px-3 py-1 rounded-md text-xs font-medium transition-colors"
+                          >
+                            Aún no
+                          </button>
+                        </div>
                       )}
                     </div>
                   </motion.div>

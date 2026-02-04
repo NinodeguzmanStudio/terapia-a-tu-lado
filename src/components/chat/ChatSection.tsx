@@ -79,8 +79,6 @@ export function ChatSection({
                                 </h3>
                                 <div className="h-px w-12 bg-primary/30 mb-6" />
                                 <p className="text-muted-foreground max-w-sm leading-relaxed text-balance text-center">
-                                    <span className="italic">"Este no es un chatbot de respuestas rápidas. Es un espacio de reflexión profunda que evoluciona contigo."</span>
-                                    <br /><br />
                                     Este es tu espacio seguro y privado. Cuéntame, ¿qué tienes en mente hoy?
                                 </p>
                             </motion.div>

@@ -67,6 +67,19 @@ export function TherapyApp() {
     }
   }, [messageCount, messages.length, messages, runFullAnalysis, setSuggestions]);
 
+  // Branching invitation after 2nd user message
+  useEffect(() => {
+    if (messageCount === 2) {
+      toast.info("Descubrimiento de Progreso", {
+        description: "Has dado pasos importantes. Si te sientes listo, podemos mirar cómo ha ido evolucionando tu camino hoy en el área de estadísticas.",
+        action: {
+          label: "Ver Progreso",
+          onClick: () => setActiveTab("stats"),
+        },
+      });
+    }
+  }, [messageCount]);
+
   const handleResetChat = async () => {
     if (!userId || !userProfile?.is_moderator) return;
     await resetChat();

@@ -16,7 +16,7 @@ export function useSuggestions(userId: string | null) {
             .gte("created_at", today);
 
         if (savedSuggestions && savedSuggestions.length > 0) {
-            setSuggestions(savedSuggestions.map(s => ({
+            setSuggestions(savedSuggestions.slice(0, 3).map(s => ({
                 id: s.id,
                 text: s.suggestion_text,
                 category: s.category || "reflexión",
