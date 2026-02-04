@@ -115,7 +115,7 @@ export function useAnalysis(userId: string | null) {
         } finally {
             setIsAnalyzing(false);
         }
-    }, [userId]);
+    }, [userId, fetchHistory]);
 
     // Initial load of history
     useEffect(() => {
