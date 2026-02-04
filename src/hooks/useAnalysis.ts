@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { EmotionData, AnalysisData, Message, Suggestion } from "@/types/therapy";
+import { EmotionData, AnalysisData, Message, Suggestion, HistoricalEmotion } from "@/types/therapy";
 
 export function useAnalysis(userId: string | null) {
     const [emotionData, setEmotionData] = useState<EmotionData | null>(null);
     const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [historicalAnalysis, setHistoricalAnalysis] = useState<any[]>([]);
+    const [historicalAnalysis, setHistoricalAnalysis] = useState<HistoricalEmotion[]>([]);
 
     const fetchHistory = useCallback(async () => {
         if (!userId) return;

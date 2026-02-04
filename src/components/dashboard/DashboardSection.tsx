@@ -6,13 +6,13 @@ import { DailySuggestions } from "@/components/dashboard/DailySuggestions";
 import { StreakCalendar } from "@/components/dashboard/StreakCalendar";
 import { StreakRewards } from "@/components/dashboard/StreakRewards";
 import { EmotionTrendChart } from "@/components/dashboard/EmotionTrendChart";
-import { UserProfile, EmotionData, AnalysisData, Suggestion } from "@/types/therapy";
+import { UserProfile, EmotionData, AnalysisData, Suggestion, HistoricalEmotion } from "@/types/therapy";
 
 interface DashboardSectionProps {
     userProfile: UserProfile | null;
     emotionData: EmotionData | null;
     analysisData: AnalysisData | null;
-    historicalAnalysis: any[];
+    historicalAnalysis: HistoricalEmotion[];
     suggestions: Suggestion[];
     isAnalyzing: boolean;
     activeDates: Date[];

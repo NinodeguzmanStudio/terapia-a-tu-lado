@@ -2,9 +2,10 @@ import { motion } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { HistoricalEmotion } from "@/types/therapy";
 
 interface EmotionTrendChartProps {
-    data: any[];
+    data: HistoricalEmotion[];
     isLoading?: boolean;
 }
 

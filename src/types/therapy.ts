@@ -36,3 +36,16 @@ export interface UserProfile {
     streak_days: number;
     total_sessions: number;
 }
+
+export interface HistoricalEmotion {
+    id: string;
+    analysis_date: string;
+    anxiety_percentage: number;
+    anger_percentage: number;
+    sadness_percentage: number;
+    stability_percentage: number;
+    joy_percentage: number;
+    main_trigger?: string;
+    core_belief?: string;
+    evolution_notes?: string;
+}
