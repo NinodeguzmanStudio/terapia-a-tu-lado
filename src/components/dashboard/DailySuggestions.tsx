@@ -37,7 +37,7 @@ export function DailySuggestions({ suggestions, onToggle, onAddNote, isLoading }
   if (isLoading) {
     return (
       <div className="therapy-card">
-        <h3 className="text-xl font-serif mb-4">Sugerencias del Día</h3>
+        <h3 className="text-xl font-serif mb-4">Pasos de Crecimiento</h3>
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="animate-pulse flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
@@ -55,7 +55,7 @@ export function DailySuggestions({ suggestions, onToggle, onAddNote, isLoading }
       <div className="therapy-card text-center py-8">
         <Sparkles className="h-10 w-10 mx-auto mb-3 text-accent" />
         <p className="text-muted-foreground">
-          Las sugerencias aparecerán después de tu primera conversación
+          Los pasos de crecimiento aparecerán después de tu primera conversación
         </p>
       </div>
     );
@@ -67,7 +67,7 @@ export function DailySuggestions({ suggestions, onToggle, onAddNote, isLoading }
   return (
     <div className="therapy-card">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-serif">Sugerencias del Día</h3>
+        <h3 className="text-xl font-serif">Pasos de Crecimiento</h3>
         <span className="text-sm text-muted-foreground">
           {completedCount}/{suggestions.length} completadas
         </span>
