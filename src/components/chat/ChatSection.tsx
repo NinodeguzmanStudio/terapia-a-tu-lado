@@ -101,14 +101,14 @@ export function ChatSection({
                                     className="mt-4 p-4 bg-sage-light/30 rounded-xl text-center"
                                 >
                                     <p className="text-sm text-muted-foreground">
-                                        💫 Has tenido varias conversaciones profundas.
+                                        Has tenido varias conversaciones profundas.
                                         <button
                                             onClick={() => setActiveTab("stats")}
                                             className="text-primary hover:underline ml-1"
                                         >
                                             Revisa tu progreso
                                         </button>
-                                        {" "}para ver cómo ha crecido tu planta.
+                                        {" "}para ver tus pasos de crecimiento y cómo florece tu planta.
                                     </p>
                                 </motion.div>
                             )}
