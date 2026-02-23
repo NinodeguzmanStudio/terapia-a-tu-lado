@@ -60,8 +60,8 @@ export function TherapyApp() {
     if (messageCount === 3 && messages.length >= 3) {
       runFullAnalysis(messages, (newSuggestions) => {
         setSuggestions(newSuggestions);
-        toast.success("¡Análisis completado!", {
-          description: "Hemos actualizado tus estadísticas y sugerencias diarias.",
+        toast.success("Evaluación completada", {
+          description: "Tu situación emocional y pasos de crecimiento han sido actualizados.",
         });
       });
     }
@@ -70,10 +70,10 @@ export function TherapyApp() {
   // Branching invitation after 2nd user message
   useEffect(() => {
     if (messageCount === 2) {
-      toast.info("Descubrimiento de Progreso", {
-        description: "Has dado pasos importantes. Si te sientes listo, podemos mirar cómo ha ido evolucionando tu camino hoy en el área de estadísticas.",
+      toast.info("Tu evaluación está lista", {
+        description: "Hemos analizado tus patrones emocionales y preparado pasos de crecimiento personalizados para ti. Si tienes dudas, pregúntale a tu terapeuta.",
         action: {
-          label: "Ver Progreso",
+          label: "Ver Mi Progreso",
           onClick: () => setActiveTab("stats"),
         },
       });
