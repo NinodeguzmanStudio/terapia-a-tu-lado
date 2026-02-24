@@ -1,10 +1,11 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import { ChatMessage } from "@/components/chat/ChatMessage";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { Message } from "@/types/therapy";
+import { WeatherBackground, analyzeMessageMood } from "@/components/WeatherBackground";
 
 interface ChatSectionProps {
     messages: Message[];
@@ -39,9 +40,14 @@ export function ChatSection({
         scrollToBottom();
     }, [messages]);
 
+    // Analyze mood from messages → determine weather automatically
+    const currentWeather = useMemo(() => {
+        return analyzeMessageMood(messages);
+    }, [messages]);
+
     return (
         <div className="flex-1 flex flex-col min-h-0">
-            <header className="px-4 lg:px-8 py-4 border-b border-border bg-card/50 backdrop-blur-sm">
+            <header className="px-4 lg:px-8 py-4 border-b border-border bg-card/50 backdrop-blur-sm relative z-20">
                 <div className="max-w-3xl mx-auto flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-warm flex items-center justify-center">
                         <Sparkles className="h-5 w-5 text-white" />
@@ -55,72 +61,81 @@ export function ChatSection({
                 </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6">
-                <div className="max-w-3xl mx-auto">
-                    {isLoadingHistory ? (
-                        <div className="text-center py-12">
-                            <div className="animate-pulse text-muted-foreground">
-                                Cargando tu historial...
-                            </div>
-                        </div>
-                    ) : messages.length === 0 ? (
-                        <div className="text-center py-20 lg:py-32">
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ duration: 0.5 }}
-                                className="inline-flex flex-col items-center"
-                            >
-                                <div className="w-24 h-24 rounded-full bg-gradient-warm flex items-center justify-center mb-8 shadow-glow animate-pulse-soft">
-                                    <Sparkles className="h-12 w-12 text-white" />
-                                </div>
-                                <h3 className="text-3xl font-serif mb-4 text-foreground">
-                                    {welcomeMessage.trim() || "Bienvenido/a"}
-                                </h3>
-                                <div className="h-px w-12 bg-primary/30 mb-6" />
-                                <p className="text-muted-foreground max-w-sm leading-relaxed text-balance text-center">
-                                    Este es tu espacio seguro y privado. Cuéntame, ¿qué tienes en mente hoy?
-                                </p>
-                            </motion.div>
-                        </div>
-                    ) : (
-                        <>
-                            {messages.map((message) => (
-                                <ChatMessage
-                                    key={message.id}
-                                    role={message.role}
-                                    content={message.content}
-                                    isStreaming={isStreaming && message.id === messages[messages.length - 1]?.id && message.role === "assistant"}
-                                />
-                            ))}
+            {/* Chat area with weather behind */}
+            <div className="flex-1 overflow-y-auto relative">
+                {/* Weather layer — behind messages, inside scroll area */}
+                <div className="sticky top-0 left-0 right-0 h-full -mb-[100%] pointer-events-none" style={{ zIndex: 0 }}>
+                    <WeatherBackground weather={currentWeather} />
+                </div>
 
-                            {totalConversations >= 6 && messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && (
+                {/* Messages layer — above weather */}
+                <div className="relative px-4 lg:px-8 py-6" style={{ zIndex: 1 }}>
+                    <div className="max-w-3xl mx-auto">
+                        {isLoadingHistory ? (
+                            <div className="text-center py-12">
+                                <div className="animate-pulse text-muted-foreground">
+                                    Cargando tu historial...
+                                </div>
+                            </div>
+                        ) : messages.length === 0 ? (
+                            <div className="text-center py-20 lg:py-32">
                                 <motion.div
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="mt-4 p-4 bg-sage-light/30 rounded-xl text-center"
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.5 }}
+                                    className="inline-flex flex-col items-center"
                                 >
-                                    <p className="text-sm text-muted-foreground">
-                                        Has tenido varias conversaciones profundas.
-                                        <button
-                                            onClick={() => setActiveTab("stats")}
-                                            className="text-primary hover:underline ml-1"
-                                        >
-                                            Revisa tu progreso
-                                        </button>
-                                        {" "}para ver tus pasos de crecimiento y cómo florece tu planta.
+                                    <div className="w-24 h-24 rounded-full bg-gradient-warm flex items-center justify-center mb-8 shadow-glow animate-pulse-soft">
+                                        <Sparkles className="h-12 w-12 text-white" />
+                                    </div>
+                                    <h3 className="text-3xl font-serif mb-4 text-foreground">
+                                        {welcomeMessage.trim() || "Bienvenido/a"}
+                                    </h3>
+                                    <div className="h-px w-12 bg-primary/30 mb-6" />
+                                    <p className="text-muted-foreground max-w-sm leading-relaxed text-balance text-center">
+                                        Este es tu espacio seguro y privado. Cuéntame, ¿qué tienes en mente hoy?
                                     </p>
                                 </motion.div>
-                            )}
-                        </>
-                    )}
+                            </div>
+                        ) : (
+                            <>
+                                {messages.map((message) => (
+                                    <ChatMessage
+                                        key={message.id}
+                                        role={message.role}
+                                        content={message.content}
+                                        isStreaming={isStreaming && message.id === messages[messages.length - 1]?.id && message.role === "assistant"}
+                                    />
+                                ))}
 
-                    {isLoading && <TypingIndicator />}
-                    <div ref={messagesEndRef} />
+                                {totalConversations >= 6 && messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="mt-4 p-4 bg-card/60 backdrop-blur-sm rounded-xl text-center border border-border/50"
+                                    >
+                                        <p className="text-sm text-muted-foreground">
+                                            Has tenido varias conversaciones profundas.
+                                            <button
+                                                onClick={() => setActiveTab("stats")}
+                                                className="text-primary hover:underline ml-1"
+                                            >
+                                                Revisa tu progreso
+                                            </button>
+                                            {" "}para ver tus pasos de crecimiento y cómo florece tu planta.
+                                        </p>
+                                    </motion.div>
+                                )}
+                            </>
+                        )}
+
+                        {isLoading && <TypingIndicator />}
+                        <div ref={messagesEndRef} />
+                    </div>
                 </div>
             </div>
 
-            <div className="max-w-3xl mx-auto w-full px-4 lg:px-0">
+            <div className="max-w-3xl mx-auto w-full px-4 lg:px-0 relative z-20">
                 <ChatInput
                     onSend={sendMessage}
                     isLoading={isLoading || isStreaming}
