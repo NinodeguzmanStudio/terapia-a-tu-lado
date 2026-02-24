@@ -60,22 +60,22 @@ export function TherapyApp() {
     if (messageCount === 3 && messages.length >= 3) {
       runFullAnalysis(messages, (newSuggestions) => {
         setSuggestions(newSuggestions);
-        toast.success("Evaluación completada", {
-          description: "Tu situación emocional y pasos de crecimiento han sido actualizados.",
+        toast.success("Tu evaluación está lista", {
+          description: "Tus patrones emocionales y pasos de crecimiento han sido actualizados.",
+          action: {
+            label: "Ver Mi Progreso",
+            onClick: () => setActiveTab("stats"),
+          },
         });
       });
     }
   }, [messageCount, messages.length, messages, runFullAnalysis, setSuggestions]);
 
-  // Branching invitation after 2nd user message
+  // Branching invitation after 2nd user message — tell them it's coming
   useEffect(() => {
     if (messageCount === 2) {
-      toast.info("Tu evaluación está lista", {
-        description: "Hemos analizado tus patrones emocionales y preparado pasos de crecimiento personalizados para ti. Si tienes dudas, pregúntale a tu terapeuta.",
-        action: {
-          label: "Ver Mi Progreso",
-          onClick: () => setActiveTab("stats"),
-        },
+      toast.info("Estamos preparando tu evaluación", {
+        description: "Sigue conversando. En tu próximo mensaje analizaremos tus patrones emocionales.",
       });
     }
   }, [messageCount]);
