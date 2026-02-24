@@ -47,7 +47,8 @@ export function ChatSection({
 
     return (
         <div className="flex-1 flex flex-col min-h-0">
-            <header className="px-4 lg:px-8 py-4 border-b border-border bg-card/50 backdrop-blur-sm relative z-20">
+            {/* Header - always on top */}
+            <header className="px-4 lg:px-8 py-4 border-b border-border bg-card/80 backdrop-blur-sm relative z-20">
                 <div className="max-w-3xl mx-auto flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-warm flex items-center justify-center">
                         <Sparkles className="h-5 w-5 text-white" />
@@ -61,15 +62,15 @@ export function ChatSection({
                 </div>
             </header>
 
-            {/* Chat area with weather behind */}
-            <div className="flex-1 overflow-y-auto relative">
-                {/* Weather layer — behind messages, inside scroll area */}
-                <div className="sticky top-0 left-0 right-0 h-full -mb-[100%] pointer-events-none" style={{ zIndex: 0 }}>
+            {/* Chat area: relative container with weather behind + scrollable messages on top */}
+            <div className="flex-1 relative overflow-hidden">
+                {/* Weather — absolute, fills container, behind everything */}
+                <div className="absolute inset-0 z-0">
                     <WeatherBackground weather={currentWeather} />
                 </div>
 
-                {/* Messages layer — above weather */}
-                <div className="relative px-4 lg:px-8 py-6" style={{ zIndex: 1 }}>
+                {/* Scrollable messages — on top of weather */}
+                <div className="absolute inset-0 z-10 overflow-y-auto px-4 lg:px-8 py-6">
                     <div className="max-w-3xl mx-auto">
                         {isLoadingHistory ? (
                             <div className="text-center py-12">
@@ -112,7 +113,7 @@ export function ChatSection({
                                     <motion.div
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        className="mt-4 p-4 bg-card/60 backdrop-blur-sm rounded-xl text-center border border-border/50"
+                                        className="mt-4 p-4 bg-card/70 backdrop-blur-sm rounded-xl text-center border border-border/50"
                                     >
                                         <p className="text-sm text-muted-foreground">
                                             Has tenido varias conversaciones profundas.
@@ -135,6 +136,7 @@ export function ChatSection({
                 </div>
             </div>
 
+            {/* Input - always on bottom */}
             <div className="max-w-3xl mx-auto w-full px-4 lg:px-0 relative z-20">
                 <ChatInput
                     onSend={sendMessage}
