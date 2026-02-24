@@ -6,17 +6,60 @@ interface WeatherBackgroundProps {
   weather: WeatherState;
 }
 
-// ====== Snowflake particles (for storm only — cold emotional state) ======
+// ====== Rain drops — darker, more visible ======
+function RainParticles({ intensity }: { intensity: "light" | "heavy" }) {
+  const count = intensity === "heavy" ? 55 : 30;
+  const drops = useRef(
+    Array.from({ length: count }, (_, i) => ({
+      id: i,
+      left: Math.random() * 115 - 8,
+      height: 6 + Math.random() * 14,
+      duration: 0.35 + Math.random() * 0.55,
+      delay: Math.random() * 2.5,
+      opacity: intensity === "heavy"
+        ? 0.35 + Math.random() * 0.25
+        : 0.2 + Math.random() * 0.2,
+      color: intensity === "heavy"
+        ? `rgba(100,130,175,${0.35 + Math.random() * 0.25})`
+        : `rgba(120,150,190,${0.2 + Math.random() * 0.2})`,
+    }))
+  ).current;
+
+  return (
+    <>
+      {drops.map((d) => (
+        <div
+          key={d.id}
+          className="absolute pointer-events-none animate-rainfall"
+          style={{
+            left: `${d.left}%`,
+            top: "-14px",
+            width: "2px",
+            height: `${d.height}px`,
+            borderRadius: "2px",
+            backgroundColor: d.color,
+            animationDuration: `${d.duration}s`,
+            animationDelay: `${d.delay}s`,
+            transform: "rotate(25deg)",
+            transformOrigin: "top left",
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+// ====== Snow — more visible flakes ======
 function SnowParticles() {
   const flakes = useRef(
-    Array.from({ length: 30 }, (_, i) => ({
+    Array.from({ length: 25 }, (_, i) => ({
       id: i,
       char: ["❄", "❅", "✦", "·", "°"][Math.floor(Math.random() * 5)],
       left: Math.random() * 100,
-      size: 7 + Math.random() * 10,
+      size: 8 + Math.random() * 12,
       duration: 6 + Math.random() * 10,
       delay: Math.random() * 12,
-      opacity: 0.12 + Math.random() * 0.25,
+      opacity: 0.25 + Math.random() * 0.35,
     }))
   ).current;
 
@@ -30,10 +73,10 @@ function SnowParticles() {
             left: `${f.left}%`,
             top: "-20px",
             fontSize: `${f.size}px`,
-            color: "rgba(200,210,225,0.5)",
+            color: `rgba(140,160,190,${f.opacity})`,
+            textShadow: "0 0 4px rgba(140,160,190,0.3)",
             animationDuration: `${f.duration}s`,
             animationDelay: `${f.delay}s`,
-            opacity: f.opacity,
           }}
         >
           {f.char}
@@ -43,47 +86,7 @@ function SnowParticles() {
   );
 }
 
-// ====== Rain drops ======
-function RainParticles({ intensity }: { intensity: "light" | "heavy" }) {
-  const count = intensity === "heavy" ? 50 : 25;
-  const drops = useRef(
-    Array.from({ length: count }, (_, i) => ({
-      id: i,
-      left: Math.random() * 115 - 8,
-      height: 4 + Math.random() * 10,
-      duration: 0.4 + Math.random() * 0.6,
-      delay: Math.random() * 2.5,
-      opacity: intensity === "heavy"
-        ? 0.2 + Math.random() * 0.2
-        : 0.12 + Math.random() * 0.12,
-    }))
-  ).current;
-
-  return (
-    <>
-      {drops.map((d) => (
-        <div
-          key={d.id}
-          className="absolute pointer-events-none animate-rainfall"
-          style={{
-            left: `${d.left}%`,
-            top: "-12px",
-            width: "1.5px",
-            height: `${d.height}px`,
-            borderRadius: "2px",
-            backgroundColor: `rgba(155,180,215,${d.opacity})`,
-            animationDuration: `${d.duration}s`,
-            animationDelay: `${d.delay}s`,
-            transform: "rotate(25deg)",
-            transformOrigin: "top left",
-          }}
-        />
-      ))}
-    </>
-  );
-}
-
-// ====== Storm lightning flash ======
+// ====== Lightning ======
 function LightningFlash() {
   return (
     <div
@@ -93,14 +96,14 @@ function LightningFlash() {
   );
 }
 
-// ====== Clouds ======
-function CloudParticles({ count = 4 }: { count?: number }) {
+// ====== Clouds — more visible ======
+function CloudParticles({ count = 4, darkness = 0.06 }: { count?: number; darkness?: number }) {
   const clouds = useRef(
     Array.from({ length: count }, (_, i) => ({
       id: i,
       top: 4 + i * 12 + Math.random() * 8,
-      width: 80 + Math.random() * 130,
-      height: 14 + Math.random() * 14,
+      width: 90 + Math.random() * 140,
+      height: 16 + Math.random() * 16,
       duration: 22 + Math.random() * 28,
       delay: -Math.random() * 22,
     }))
@@ -117,8 +120,8 @@ function CloudParticles({ count = 4 }: { count?: number }) {
             width: `${c.width}px`,
             height: `${c.height}px`,
             borderRadius: "50px",
-            background: "rgba(180,170,155,0.045)",
-            filter: "blur(8px)",
+            background: `rgba(150,145,135,${darkness})`,
+            filter: "blur(10px)",
             animationDuration: `${c.duration}s`,
             animationDelay: `${c.delay}s`,
           }}
@@ -128,17 +131,17 @@ function CloudParticles({ count = 4 }: { count?: number }) {
   );
 }
 
-// ====== Warm particles (clearing / sunny) ======
+// ====== Warm particles — brighter ======
 function WarmParticles({ intensity }: { intensity: "soft" | "bright" }) {
-  const count = intensity === "bright" ? 14 : 8;
+  const count = intensity === "bright" ? 16 : 10;
   const particles = useRef(
     Array.from({ length: count }, (_, i) => ({
       id: i,
       left: Math.random() * 100,
-      size: 1.5 + Math.random() * 2.5,
+      size: 2 + Math.random() * 3,
       duration: 6 + Math.random() * 10,
       delay: Math.random() * 10,
-      alpha: intensity === "bright" ? 0.25 + Math.random() * 0.2 : 0.15 + Math.random() * 0.15,
+      alpha: intensity === "bright" ? 0.4 + Math.random() * 0.3 : 0.25 + Math.random() * 0.2,
     }))
   ).current;
 
@@ -154,8 +157,8 @@ function WarmParticles({ intensity }: { intensity: "soft" | "bright" }) {
             width: `${p.size}px`,
             height: `${p.size}px`,
             borderRadius: "50%",
-            background: `rgba(225,190,110,${p.alpha})`,
-            boxShadow: `0 0 ${p.size * 3}px rgba(225,190,110,${p.alpha * 0.6})`,
+            background: `rgba(210,170,60,${p.alpha})`,
+            boxShadow: `0 0 ${p.size * 4}px rgba(210,170,60,${p.alpha * 0.5})`,
             animationDuration: `${p.duration}s`,
             animationDelay: `${p.delay}s`,
           }}
@@ -169,19 +172,18 @@ function WarmParticles({ intensity }: { intensity: "soft" | "bright" }) {
 export function WeatherBackground({ weather }: WeatherBackgroundProps) {
   const [displayWeather, setDisplayWeather] = useState<WeatherState>(weather);
 
-  // Gradual transition: delay particle swap to sync with background fade
   useEffect(() => {
-    const timer = setTimeout(() => setDisplayWeather(weather), 800);
+    const timer = setTimeout(() => setDisplayWeather(weather), 600);
     return () => clearTimeout(timer);
   }, [weather]);
 
-  // Background tints — very subtle, never covering text
+  // Background tints — noticeable but not overpowering
   const bgTint: Record<WeatherState, string> = {
-    storm: "rgba(180,190,210,0.06)",
-    rain: "rgba(175,190,215,0.04)",
-    cloudy: "rgba(180,175,165,0.03)",
-    clearing: "rgba(225,200,140,0.03)",
-    sunny: "rgba(240,210,130,0.025)",
+    storm: "linear-gradient(180deg, rgba(160,170,195,0.18) 0%, rgba(140,155,180,0.12) 100%)",
+    rain: "linear-gradient(180deg, rgba(165,178,200,0.12) 0%, rgba(155,168,190,0.08) 100%)",
+    cloudy: "linear-gradient(180deg, rgba(175,170,160,0.07) 0%, rgba(170,165,155,0.04) 100%)",
+    clearing: "linear-gradient(180deg, rgba(230,210,150,0.08) 0%, rgba(225,200,140,0.05) 100%)",
+    sunny: "linear-gradient(180deg, rgba(240,215,120,0.1) 0%, rgba(235,205,110,0.06) 100%)",
   };
 
   return (
@@ -189,8 +191,7 @@ export function WeatherBackground({ weather }: WeatherBackgroundProps) {
       className="absolute inset-0 overflow-hidden pointer-events-none"
       style={{
         background: bgTint[weather],
-        transition: "background 4s ease",
-        zIndex: 0,
+        transition: "background 3s ease",
       }}
     >
       {displayWeather === "storm" && (
@@ -203,14 +204,14 @@ export function WeatherBackground({ weather }: WeatherBackgroundProps) {
       {displayWeather === "rain" && (
         <>
           <RainParticles intensity="light" />
-          <CloudParticles count={3} />
+          <CloudParticles count={3} darkness={0.07} />
         </>
       )}
-      {displayWeather === "cloudy" && <CloudParticles count={4} />}
+      {displayWeather === "cloudy" && <CloudParticles count={5} darkness={0.06} />}
       {displayWeather === "clearing" && (
         <>
           <WarmParticles intensity="soft" />
-          <CloudParticles count={2} />
+          <CloudParticles count={2} darkness={0.04} />
         </>
       )}
       {displayWeather === "sunny" && <WarmParticles intensity="bright" />}
@@ -218,14 +219,15 @@ export function WeatherBackground({ weather }: WeatherBackgroundProps) {
   );
 }
 
-// ====== MOOD ANALYZER — reads messages and returns weather ======
+// ====== MOOD ANALYZER — reads messages in real time ======
 const NEGATIVE_WORDS = [
   "triste", "mal", "dolor", "sufr", "llorar", "lloro", "miedo", "ansiedad", "ansios",
   "angustia", "desesper", "solo", "sola", "muerte", "morir", "odio", "rabia", "ira",
   "impotencia", "cansad", "agotad", "abrum", "no puedo", "no sé qué hacer",
   "perdid", "vacío", "vacía", "culpa", "vergüenza", "insomnio", "pánico",
   "depresión", "deprimid", "maltrat", "abuso", "violencia", "golpe",
-  "triste", "tristeza", "horrible", "terrible", "insoportable",
+  "tristeza", "horrible", "terrible", "insoportable", "asust", "aterr",
+  "fracas", "inútil", "no sirvo", "no valgo", "nadie me", "estoy hart",
   // Portuguese
   "triste", "dor", "sofr", "chorar", "medo", "ansiedade", "angústia",
   "desespero", "sozinho", "sozinha", "morte", "morrer", "ódio", "raiva",
@@ -238,7 +240,8 @@ const POSITIVE_WORDS = [
   "esperanza", "agradec", "contento", "contenta", "alivia", "respir",
   "progreso", "avance", "logr", "entend", "comprend", "claridad",
   "fuerza", "valiente", "libre", "amor", "quiero intentar", "voy a",
-  "puedo", "motivad", "energía", "ilusión",
+  "puedo", "motivad", "energía", "ilusión", "bonito", "bonita",
+  "sonr", "risa", "divert", "disfrut",
   // Portuguese
   "melhor", "bem", "obrigad", "tranquil", "paz", "calmo", "alegr", "feliz",
   "esperança", "agradec", "alívio", "respir", "progresso", "avanço",
@@ -247,16 +250,15 @@ const POSITIVE_WORDS = [
 
 const CRISIS_WORDS = [
   "suicid", "matar", "no quiero vivir", "acabar con todo",
-  "no vale la pena", "desaparecer",
-  "suicíd", "matar", "não quero viver", "acabar com tudo",
+  "no vale la pena", "desaparecer", "quiero morir",
+  "suicíd", "não quero viver", "acabar com tudo",
 ];
 
 export function analyzeMessageMood(
   messages: Array<{ role: string; content: string }>
 ): WeatherState {
-  if (messages.length === 0) return "cloudy"; // Neutral start
+  if (messages.length === 0) return "cloudy";
 
-  // Analyze last 4 user messages (recent mood)
   const recentUserMsgs = messages
     .filter((m) => m.role === "user")
     .slice(-4)
@@ -269,23 +271,19 @@ export function analyzeMessageMood(
   let crisisDetected = false;
 
   recentUserMsgs.forEach((msg, idx) => {
-    // Recent messages weigh more
-    const weight = 1 + idx * 0.5;
+    const weight = 1 + idx * 0.5; // Recent messages weigh more
 
     CRISIS_WORDS.forEach((w) => {
       if (msg.includes(w)) crisisDetected = true;
     });
-
     NEGATIVE_WORDS.forEach((w) => {
       if (msg.includes(w)) negScore += weight;
     });
-
     POSITIVE_WORDS.forEach((w) => {
       if (msg.includes(w)) posScore += weight;
     });
   });
 
-  // Crisis → storm always
   if (crisisDetected) return "storm";
 
   const total = negScore + posScore;
@@ -293,30 +291,9 @@ export function analyzeMessageMood(
 
   const ratio = posScore / total;
 
-  // Graduated scale
   if (negScore > 8 && ratio < 0.15) return "storm";
-  if (negScore > 4 && ratio < 0.3) return "rain";
+  if (negScore > 3 && ratio < 0.3) return "rain";
   if (ratio < 0.45) return "cloudy";
   if (ratio < 0.65) return "clearing";
   return "sunny";
-}
-
-// ====== HISTORICAL MOOD — for cross-session weather ======
-export function emotionDataToWeather(emotionData: {
-  anxiety: number;
-  anger: number;
-  sadness: number;
-  stability: number;
-  joy: number;
-} | null): WeatherState {
-  if (!emotionData) return "cloudy";
-
-  const { anxiety, anger, sadness, stability, joy } = emotionData;
-  const negative = anxiety + anger + sadness;
-  const positive = stability + joy;
-
-  if (anger > 40 || (anxiety > 35 && sadness > 25)) return "storm";
-  if (negative > 65) return "rain";
-  if (positive > negative + 10) return positive > 70 ? "sunny" : "clearing";
-  return "cloudy";
 }
