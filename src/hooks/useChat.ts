@@ -8,9 +8,12 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
     const [isLoading, setIsLoading] = useState(false);
     const [isStreaming, setIsStreaming] = useState(false);
     const [conversationsToday, setConversationsToday] = useState(0);
-    const [messageCount, setMessageCount] = useState(0);
+    const [userMessageCount, setUserMessageCount] = useState(0);
     const [totalConversations, setTotalConversations] = useState(0);
     const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+
+    // Track the last threshold at which analysis was triggered
+    const lastAnalyzedThresholdRef = useRef(0);
 
     const { toast } = useToast();
 
@@ -48,11 +51,16 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             })));
 
             const userMsgCount = chatMessages.filter(m => m.role === "user").length;
-            setMessageCount(userMsgCount);
+            setUserMessageCount(userMsgCount);
             setConversationsToday(Math.min(Math.floor(userMsgCount / 3), 3));
+
+            // Mark already-analyzed thresholds so we don't re-trigger on reload
+            if (userMsgCount >= 3) {
+                lastAnalyzedThresholdRef.current = Math.floor(userMsgCount / 3) * 3;
+            }
         }
 
-        // Count total conversations
+        // Count total user messages across all time
         const { count } = await supabase
             .from("chat_messages")
             .select("*", { count: "exact", head: true })
@@ -79,6 +87,9 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             content,
         };
 
+        // Optimistically update user message count BEFORE sending
+        const newUserMsgCount = userMessageCount + 1;
+        setUserMessageCount(newUserMsgCount);
         setMessages((prev) => [...prev, userMessage]);
         await saveMessage(userMessage);
         setIsLoading(true);
@@ -177,14 +188,15 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
 
             await saveMessage({ ...assistantMessage, content: assistantContent });
             setIsStreaming(false);
-            setMessageCount((prev) => prev + 1);
             setTotalConversations((prev) => prev + 1);
 
-            if (messageCount === 0) {
-                setConversationsToday((prev) => prev + 1);
-            }
+            // Update conversations-today based on complete 3-message cycles
+            setConversationsToday(Math.min(Math.floor(newUserMsgCount / 3), 3));
+
         } catch (error) {
             console.error("Chat error:", error);
+            // Rollback optimistic count on error
+            setUserMessageCount((prev) => Math.max(prev - 1, 0));
             setIsLoading(false);
             setIsStreaming(false);
             toast({
@@ -193,14 +205,35 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
                 variant: "destructive",
             });
         }
-    }, [messages, conversationsToday, messageCount, toast, userId, userProfile, totalConversations, saveMessage]);
+    }, [messages, conversationsToday, userMessageCount, toast, userId, userProfile, totalConversations, saveMessage]);
+
+    /**
+     * Returns true every time userMessageCount crosses a new multiple of 3
+     * (3rd, 6th, 9th user message). Only fires once per threshold.
+     */
+    const shouldTriggerAnalysis = useCallback((): boolean => {
+        if (userMessageCount < 3) return false;
+        const currentThreshold = Math.floor(userMessageCount / 3) * 3;
+        if (currentThreshold > lastAnalyzedThresholdRef.current) {
+            lastAnalyzedThresholdRef.current = currentThreshold;
+            return true;
+        }
+        return false;
+    }, [userMessageCount]);
 
     const resetChat = useCallback(async () => {
         if (!userId) return;
-        await supabase.from("chat_messages").delete().eq("user_id", userId);
+        const today = new Date().toISOString().split('T')[0];
+        // FIXED: Only delete TODAY's messages — preserve historical data
+        await supabase
+            .from("chat_messages")
+            .delete()
+            .eq("user_id", userId)
+            .eq("session_date", today);
         setMessages([]);
-        setMessageCount(0);
+        setUserMessageCount(0);
         setConversationsToday(0);
+        lastAnalyzedThresholdRef.current = 0;
     }, [userId]);
 
     return {
@@ -208,11 +241,12 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
         isLoading,
         isStreaming,
         conversationsToday,
-        messageCount,
+        userMessageCount,
         totalConversations,
         isLoadingHistory,
         sendMessage,
         loadChatHistory,
         resetChat,
+        shouldTriggerAnalysis,
     };
 }
