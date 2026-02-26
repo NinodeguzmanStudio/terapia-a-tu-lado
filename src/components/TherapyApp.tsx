@@ -47,12 +47,12 @@ export function TherapyApp() {
     isAnalyzing,
     runFullAnalysis,
     fetchHistory,
+    fetchAchievements,
     resetAnalysis,
   } = useAnalysis(userId);
 
   const { theme, setTheme } = useTheme() || { theme: "light", setTheme: () => { } };
 
-  // Initial load
   useEffect(() => {
     if (userId) {
       loadChatHistory(userId);
@@ -60,7 +60,6 @@ export function TherapyApp() {
     }
   }, [userId, loadChatHistory, loadSuggestions]);
 
-  // Analysis trigger — fires every 3rd user message
   useEffect(() => {
     if (isStreaming || isLoading) return;
     if (messages.length < 3) return;
@@ -80,7 +79,6 @@ export function TherapyApp() {
     }
   }, [userMessageCount, isStreaming, isLoading, messages, shouldTriggerAnalysis, runFullAnalysis, setSuggestions]);
 
-  // Heads-up before analysis triggers (at message #2)
   useEffect(() => {
     if (userMessageCount === 2 && !isStreaming && !isLoading) {
       toast.info("Estamos preparando tu evaluación", {
@@ -89,19 +87,18 @@ export function TherapyApp() {
     }
   }, [userMessageCount, isStreaming, isLoading]);
 
-  // Moderator: full reset — wipes ALL data to start from zero
   const handleResetChat = async () => {
     if (!userId || !userProfile?.is_moderator) return;
     await fullReset();
-    await resetSuggestions();
+    resetSuggestions();
     resetAnalysis();
     await refreshProfile();
+    setActiveTab("chat");
     toast.success("Reset completo", { description: "Todos los datos fueron eliminados. Empieza de cero." });
   };
 
   const confirmedSuggestions = suggestions.filter(s => s.confirmed).length;
 
-  // Celebrate milestones
   useEffect(() => {
     if (userProfile?.streak_days) {
       if (userProfile.streak_days === 7) {
