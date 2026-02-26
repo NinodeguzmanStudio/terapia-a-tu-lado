@@ -8,20 +8,20 @@ interface WeatherBackgroundProps {
 
 // ====== Rain drops — darker, more visible ======
 function RainParticles({ intensity }: { intensity: "light" | "heavy" }) {
-  const count = intensity === "heavy" ? 55 : 30;
+  const count = intensity === "heavy" ? 70 : 40;
   const drops = useRef(
     Array.from({ length: count }, (_, i) => ({
       id: i,
       left: Math.random() * 115 - 8,
-      height: 6 + Math.random() * 14,
-      duration: 0.35 + Math.random() * 0.55,
+      height: 10 + Math.random() * 18,
+      duration: 0.4 + Math.random() * 0.5,
       delay: Math.random() * 2.5,
       opacity: intensity === "heavy"
-        ? 0.35 + Math.random() * 0.25
-        : 0.2 + Math.random() * 0.2,
+        ? 0.5 + Math.random() * 0.3
+        : 0.35 + Math.random() * 0.25,
       color: intensity === "heavy"
-        ? `rgba(100,130,175,${0.35 + Math.random() * 0.25})`
-        : `rgba(120,150,190,${0.2 + Math.random() * 0.2})`,
+        ? `rgba(80,110,160,${0.5 + Math.random() * 0.3})`
+        : `rgba(100,130,175,${0.35 + Math.random() * 0.25})`,
     }))
   ).current;
 
@@ -52,14 +52,14 @@ function RainParticles({ intensity }: { intensity: "light" | "heavy" }) {
 // ====== Snow — more visible flakes ======
 function SnowParticles() {
   const flakes = useRef(
-    Array.from({ length: 25 }, (_, i) => ({
+    Array.from({ length: 35 }, (_, i) => ({
       id: i,
       char: ["❄", "❅", "✦", "·", "°"][Math.floor(Math.random() * 5)],
       left: Math.random() * 100,
-      size: 8 + Math.random() * 12,
+      size: 10 + Math.random() * 16,
       duration: 6 + Math.random() * 10,
       delay: Math.random() * 12,
-      opacity: 0.25 + Math.random() * 0.35,
+      opacity: 0.4 + Math.random() * 0.4,
     }))
   ).current;
 
@@ -73,8 +73,8 @@ function SnowParticles() {
             left: `${f.left}%`,
             top: "-20px",
             fontSize: `${f.size}px`,
-            color: `rgba(140,160,190,${f.opacity})`,
-            textShadow: "0 0 4px rgba(140,160,190,0.3)",
+            color: `rgba(180,200,230,${f.opacity})`,
+            textShadow: "0 0 6px rgba(180,200,230,0.5)",
             animationDuration: `${f.duration}s`,
             animationDelay: `${f.delay}s`,
           }}
@@ -97,13 +97,13 @@ function LightningFlash() {
 }
 
 // ====== Clouds — more visible ======
-function CloudParticles({ count = 4, darkness = 0.06 }: { count?: number; darkness?: number }) {
+function CloudParticles({ count = 4, darkness = 0.15 }: { count?: number; darkness?: number }) {
   const clouds = useRef(
     Array.from({ length: count }, (_, i) => ({
       id: i,
       top: 4 + i * 12 + Math.random() * 8,
-      width: 90 + Math.random() * 140,
-      height: 16 + Math.random() * 16,
+      width: 120 + Math.random() * 180,
+      height: 24 + Math.random() * 24,
       duration: 22 + Math.random() * 28,
       delay: -Math.random() * 22,
     }))
@@ -120,8 +120,8 @@ function CloudParticles({ count = 4, darkness = 0.06 }: { count?: number; darkne
             width: `${c.width}px`,
             height: `${c.height}px`,
             borderRadius: "50px",
-            background: `rgba(150,145,135,${darkness})`,
-            filter: "blur(10px)",
+            background: `rgba(130,135,150,${darkness})`,
+            filter: "blur(8px)",
             animationDuration: `${c.duration}s`,
             animationDelay: `${c.delay}s`,
           }}
@@ -133,15 +133,15 @@ function CloudParticles({ count = 4, darkness = 0.06 }: { count?: number; darkne
 
 // ====== Warm particles — brighter ======
 function WarmParticles({ intensity }: { intensity: "soft" | "bright" }) {
-  const count = intensity === "bright" ? 16 : 10;
+  const count = intensity === "bright" ? 20 : 12;
   const particles = useRef(
     Array.from({ length: count }, (_, i) => ({
       id: i,
       left: Math.random() * 100,
-      size: 2 + Math.random() * 3,
+      size: 3 + Math.random() * 5,
       duration: 6 + Math.random() * 10,
       delay: Math.random() * 10,
-      alpha: intensity === "bright" ? 0.4 + Math.random() * 0.3 : 0.25 + Math.random() * 0.2,
+      alpha: intensity === "bright" ? 0.5 + Math.random() * 0.35 : 0.35 + Math.random() * 0.25,
     }))
   ).current;
 
@@ -157,8 +157,8 @@ function WarmParticles({ intensity }: { intensity: "soft" | "bright" }) {
             width: `${p.size}px`,
             height: `${p.size}px`,
             borderRadius: "50%",
-            background: `rgba(210,170,60,${p.alpha})`,
-            boxShadow: `0 0 ${p.size * 4}px rgba(210,170,60,${p.alpha * 0.5})`,
+            background: `rgba(220,180,50,${p.alpha})`,
+            boxShadow: `0 0 ${p.size * 5}px rgba(220,180,50,${p.alpha * 0.6})`,
             animationDuration: `${p.duration}s`,
             animationDelay: `${p.delay}s`,
           }}
@@ -177,13 +177,13 @@ export function WeatherBackground({ weather }: WeatherBackgroundProps) {
     return () => clearTimeout(timer);
   }, [weather]);
 
-  // Background tints — noticeable but not overpowering
+  // Background tints — noticeable ambient mood
   const bgTint: Record<WeatherState, string> = {
-    storm: "linear-gradient(180deg, rgba(160,170,195,0.18) 0%, rgba(140,155,180,0.12) 100%)",
-    rain: "linear-gradient(180deg, rgba(165,178,200,0.12) 0%, rgba(155,168,190,0.08) 100%)",
-    cloudy: "linear-gradient(180deg, rgba(175,170,160,0.07) 0%, rgba(170,165,155,0.04) 100%)",
-    clearing: "linear-gradient(180deg, rgba(230,210,150,0.08) 0%, rgba(225,200,140,0.05) 100%)",
-    sunny: "linear-gradient(180deg, rgba(240,215,120,0.1) 0%, rgba(235,205,110,0.06) 100%)",
+    storm: "linear-gradient(180deg, rgba(100,110,140,0.25) 0%, rgba(80,90,120,0.18) 100%)",
+    rain: "linear-gradient(180deg, rgba(120,140,175,0.18) 0%, rgba(110,130,165,0.12) 100%)",
+    cloudy: "linear-gradient(180deg, rgba(160,158,150,0.12) 0%, rgba(150,148,140,0.08) 100%)",
+    clearing: "linear-gradient(180deg, rgba(235,210,140,0.14) 0%, rgba(230,200,130,0.08) 100%)",
+    sunny: "linear-gradient(180deg, rgba(245,220,100,0.16) 0%, rgba(240,210,90,0.10) 100%)",
   };
 
   return (
@@ -204,14 +204,14 @@ export function WeatherBackground({ weather }: WeatherBackgroundProps) {
       {displayWeather === "rain" && (
         <>
           <RainParticles intensity="light" />
-          <CloudParticles count={3} darkness={0.07} />
+          <CloudParticles count={4} darkness={0.18} />
         </>
       )}
-      {displayWeather === "cloudy" && <CloudParticles count={5} darkness={0.06} />}
+      {displayWeather === "cloudy" && <CloudParticles count={6} darkness={0.15} />}
       {displayWeather === "clearing" && (
         <>
           <WarmParticles intensity="soft" />
-          <CloudParticles count={2} darkness={0.04} />
+          <CloudParticles count={2} darkness={0.1} />
         </>
       )}
       {displayWeather === "sunny" && <WarmParticles intensity="bright" />}
@@ -291,9 +291,9 @@ export function analyzeMessageMood(
 
   const ratio = posScore / total;
 
-  if (negScore > 8 && ratio < 0.15) return "storm";
-  if (negScore > 3 && ratio < 0.3) return "rain";
-  if (ratio < 0.45) return "cloudy";
-  if (ratio < 0.65) return "clearing";
+  if (negScore > 6 && ratio < 0.2) return "storm";
+  if (negScore > 2 && ratio < 0.35) return "rain";
+  if (ratio < 0.5) return "cloudy";
+  if (ratio < 0.7) return "clearing";
   return "sunny";
 }
