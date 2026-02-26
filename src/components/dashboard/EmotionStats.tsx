@@ -46,7 +46,7 @@ export function EmotionStats({ data, isLoading }: EmotionStatsProps) {
     return (
       <div className="therapy-card text-center py-8">
         <p className="text-muted-foreground">
-          Inicia una conversación para ver tus estadísticas emocionales
+          Tus estadísticas emocionales aparecerán automáticamente después de unos mensajes de conversación
         </p>
       </div>
     );
