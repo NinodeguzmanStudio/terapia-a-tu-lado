@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,17 @@ export function ProfileSettings({
     const { toast } = useToast();
 
     const isModerator = userProfile?.is_moderator ?? false;
+
+    useEffect(() => {
+        if (isOpen && userProfile) {
+            setName(userProfile.name || "");
+            setAge(userProfile.age?.toString() || "");
+        }
+        if (isOpen) {
+            setShowDeleteConfirm(false);
+            setShowResetConfirm(false);
+        }
+    }, [isOpen, userProfile]);
 
     const handleSave = async () => {
         if (!name.trim()) {
@@ -78,6 +89,8 @@ export function ProfileSettings({
                 description: "No se pudo eliminar la cuenta en este momento.",
                 variant: "destructive",
             });
+        } else {
+            onClose();
         }
     };
 
@@ -98,7 +111,7 @@ export function ProfileSettings({
                         <DialogHeader>
                             <DialogTitle className="text-destructive">¿Estás absolutamente seguro?</DialogTitle>
                             <DialogDescription>
-                                Esta acción no se puede deshacer. Se eliminarán permanentemente tus conversaciones, análisis y todo tu progreso.
+                                Esta acción no se puede deshacer. Se eliminarán permanentemente tu cuenta, conversaciones, análisis y todo tu progreso.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="py-6 flex justify-center">
@@ -173,7 +186,6 @@ export function ProfileSettings({
                             </div>
                         </div>
 
-                        {/* === MODO DESARROLLADOR (solo moderadores) === */}
                         {isModerator && (
                             <div className="pt-4 border-t border-border">
                                 <div className="flex items-center gap-2 mb-3">
@@ -194,7 +206,6 @@ export function ProfileSettings({
                             </div>
                         )}
 
-                        {/* === ZONA DE PELIGRO === */}
                         <div className="pt-4 border-t border-border flex flex-col gap-4">
                             <div className="flex justify-between items-center">
                                 <div className="space-y-0.5">
