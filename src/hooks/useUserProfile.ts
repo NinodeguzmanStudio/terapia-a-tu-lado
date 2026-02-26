@@ -61,7 +61,7 @@ export function useUserProfile() {
             async (event, session) => {
                 if (event === "SIGNED_IN" && session?.user) {
                     await loadProfile(session.user.id);
-                } else if (event === "SIGNED_OUT" || event === "TOKEN_REFRESHED" && !session) {
+                } else if (event === "SIGNED_OUT" || (event === "TOKEN_REFRESHED" && !session)) {
                     clearProfile();
                 }
             }
