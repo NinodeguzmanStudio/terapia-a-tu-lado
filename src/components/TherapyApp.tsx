@@ -171,5 +171,5 @@ export function TherapyApp() {
         )}
       </main>
     </div>
-  );
+  ); 
 }
