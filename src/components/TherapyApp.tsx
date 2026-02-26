@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTheme } from "next-themes";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useChat } from "@/hooks/useChat";
@@ -13,18 +13,19 @@ export function TherapyApp() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"chat" | "stats">("chat");
 
-  const { userProfile, userId, activeDates, updateProfile, deleteAccount, handleLogout } = useUserProfile();
+  const { userProfile, userId, activeDates, updateProfile, deleteAccount, handleLogout, refreshProfile } = useUserProfile();
   const {
     messages,
     isLoading,
     isStreaming,
     conversationsToday,
-    messageCount,
+    userMessageCount,
     totalConversations,
     isLoadingHistory,
     sendMessage,
     loadChatHistory,
     resetChat,
+    shouldTriggerAnalysis,
   } = useChat(userId, userProfile);
 
   const {
@@ -40,8 +41,10 @@ export function TherapyApp() {
     emotionData,
     analysisData,
     historicalAnalysis,
+    achievements,
     isAnalyzing,
     runFullAnalysis,
+    fetchHistory,
     resetAnalysis,
   } = useAnalysis(userId);
 
@@ -55,11 +58,20 @@ export function TherapyApp() {
     }
   }, [userId, loadChatHistory, loadSuggestions]);
 
-  // Trigger analysis after message #3
+  // ──────────────────────────────────────────────
+  // FIXED: Analysis trigger — fires every 3rd user message,
+  // survives page reloads, and works across sessions.
+  // ──────────────────────────────────────────────
   useEffect(() => {
-    if (messageCount === 3 && messages.length >= 3) {
+    // Only check after streaming is done (assistant has responded)
+    if (isStreaming || isLoading) return;
+    if (messages.length < 3) return;
+
+    if (shouldTriggerAnalysis()) {
       runFullAnalysis(messages, (newSuggestions) => {
         setSuggestions(newSuggestions);
+        // Refresh profile to pick up streak/session updates from DB trigger
+        refreshProfile();
         toast.success("Tu evaluación está lista", {
           description: "Tus patrones emocionales y pasos de crecimiento han sido actualizados.",
           action: {
@@ -69,16 +81,16 @@ export function TherapyApp() {
         });
       });
     }
-  }, [messageCount, messages.length, messages, runFullAnalysis, setSuggestions]);
+  }, [userMessageCount, isStreaming, isLoading, messages, shouldTriggerAnalysis, runFullAnalysis, setSuggestions]);
 
-  // Branching invitation after 2nd user message — tell them it's coming
+  // Heads-up before analysis triggers (at message #2)
   useEffect(() => {
-    if (messageCount === 2) {
+    if (userMessageCount === 2 && !isStreaming && !isLoading) {
       toast.info("Estamos preparando tu evaluación", {
         description: "Sigue conversando. En tu próximo mensaje analizaremos tus patrones emocionales.",
       });
     }
-  }, [messageCount]);
+  }, [userMessageCount, isStreaming, isLoading]);
 
   const handleResetChat = async () => {
     if (!userId || !userProfile?.is_moderator) return;
@@ -149,6 +161,7 @@ export function TherapyApp() {
             analysisData={analysisData}
             historicalAnalysis={historicalAnalysis}
             suggestions={suggestions}
+            achievements={achievements}
             isAnalyzing={isAnalyzing}
             activeDates={activeDates}
             confirmedSuggestions={confirmedSuggestions}
