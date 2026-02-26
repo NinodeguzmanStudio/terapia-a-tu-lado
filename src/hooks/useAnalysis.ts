@@ -183,9 +183,12 @@ export function useAnalysis(userId: string | null) {
         }
     }, [userId, fetchHistory, fetchAchievements]);
 
+    // Full reset — clears ALL local state (DB deletion happens in useChat.fullReset)
     const resetAnalysis = useCallback(() => {
         setEmotionData(null);
         setAnalysisData(null);
+        setHistoricalAnalysis([]);
+        setAchievements([]);
     }, []);
 
     return {
