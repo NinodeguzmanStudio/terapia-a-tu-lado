@@ -32,7 +32,7 @@ const categoryIcons: Record<string, string> = {
 
 export function DailySuggestions({ suggestions, onToggle, onAddNote, isLoading }: DailySuggestionsProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [noteText, setNoteText] = useState("");
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
 
   if (isLoading) {
     return (
@@ -172,12 +172,13 @@ export function DailySuggestions({ suggestions, onToggle, onAddNote, isLoading }
                       </p>
                       <Textarea
                         placeholder="¿Qué hiciste? ¿Qué cambió en ti?"
-                        value={suggestion.notes || noteText}
-                        onChange={(e) => setNoteText(e.target.value)}
+                        value={suggestion.notes || noteDrafts[suggestion.id] || ""}
+                        onChange={(e) => setNoteDrafts(prev => ({ ...prev, [suggestion.id]: e.target.value }))}
                         onBlur={() => {
-                          if (noteText.trim()) {
-                            onAddNote(suggestion.id, noteText);
-                            setNoteText("");
+                          const draft = noteDrafts[suggestion.id];
+                          if (draft && draft.trim()) {
+                            onAddNote(suggestion.id, draft);
+                            setNoteDrafts(prev => { const next = { ...prev }; delete next[suggestion.id]; return next; });
                           }
                         }}
                         className="min-h-[60px] text-sm bg-background/50"
