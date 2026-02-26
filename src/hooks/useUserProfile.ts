@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { UserProfile } from "@/types/therapy";
 
@@ -6,51 +6,88 @@ export function useUserProfile() {
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [userId, setUserId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-
     const [activeDates, setActiveDates] = useState<Date[]>([]);
 
-    useEffect(() => {
-        const loadProfile = async () => {
-            setIsLoading(true);
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                setIsLoading(false);
-                return;
-            }
+    const loadProfile = useCallback(async (uid: string) => {
+        setIsLoading(true);
+        setUserId(uid);
 
-            setUserId(user.id);
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("name, age, is_moderator, streak_days, total_sessions")
+            .eq("user_id", uid)
+            .single();
 
-            const { data: profile } = await supabase
-                .from("profiles")
-                .select("name, age, is_moderator, streak_days, total_sessions")
-                .eq("user_id", user.id)
-                .single();
+        if (profile) {
+            setUserProfile(profile);
+        }
 
-            if (profile) {
-                setUserProfile(profile);
-            }
+        // Fetch active dates for calendar
+        const { data: messages } = await supabase
+            .from("chat_messages")
+            .select("session_date")
+            .eq("user_id", uid)
+            .eq("role", "user");
 
-            // Fetch active dates for calendar
-            const { data: messages } = await supabase
-                .from("chat_messages")
-                .select("session_date")
-                .eq("user_id", user.id)
-                .eq("role", "user");
+        if (messages) {
+            const uniqueDates = Array.from(new Set(messages.map(m => m.session_date)))
+                .map(dateStr => new Date(dateStr));
+            setActiveDates(uniqueDates);
+        }
 
-            if (messages) {
-                const uniqueDates = Array.from(new Set(messages.map(m => m.session_date)))
-                    .map(dateStr => new Date(dateStr));
-                setActiveDates(uniqueDates);
-            }
-
-            setIsLoading(false);
-        };
-
-        loadProfile();
+        setIsLoading(false);
     }, []);
 
-    const updateProfile = async (updates: { name?: string; age?: number }) => {
+    const clearProfile = useCallback(() => {
+        setUserId(null);
+        setUserProfile(null);
+        setActiveDates([]);
+        setIsLoading(false);
+    }, []);
+
+    // FIXED: Use onAuthStateChange to react to login/logout/session expiry
+    useEffect(() => {
+        // Check initial session
+        supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user) {
+                loadProfile(user.id);
+            } else {
+                setIsLoading(false);
+            }
+        });
+
+        // Subscribe to auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (event, session) => {
+                if (event === "SIGNED_IN" && session?.user) {
+                    await loadProfile(session.user.id);
+                } else if (event === "SIGNED_OUT" || event === "TOKEN_REFRESHED" && !session) {
+                    clearProfile();
+                }
+            }
+        );
+
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, [loadProfile, clearProfile]);
+
+    // Refresh profile data (useful after streak updates from trigger)
+    const refreshProfile = useCallback(async () => {
         if (!userId) return;
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("name, age, is_moderator, streak_days, total_sessions")
+            .eq("user_id", userId)
+            .single();
+
+        if (profile) {
+            setUserProfile(profile);
+        }
+    }, [userId]);
+
+    const updateProfile = async (updates: { name?: string; age?: number }) => {
+        if (!userId) return { error: new Error("No user") };
         const { error } = await supabase
             .from("profiles")
             .update(updates)
@@ -63,10 +100,8 @@ export function useUserProfile() {
     };
 
     const deleteAccount = async () => {
-        if (!userId) return;
+        if (!userId) return { error: new Error("No user") };
 
-        // Profiles are linked to user_id, so cascading delete or manual cleanup might be needed.
-        // For simplicity, we trigger the delete and sign out.
         const { error: profileError } = await supabase
             .from("profiles")
             .delete()
@@ -74,8 +109,6 @@ export function useUserProfile() {
 
         if (profileError) return { error: profileError };
 
-        // Deleting the auth user usually requires higher privileges (service role).
-        // For now, we sign out to ensure the session is cleared.
         await supabase.auth.signOut();
         return { error: null };
     };
@@ -92,5 +125,6 @@ export function useUserProfile() {
         updateProfile,
         deleteAccount,
         handleLogout,
+        refreshProfile,
     };
 }
