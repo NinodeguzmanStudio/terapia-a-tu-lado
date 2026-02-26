@@ -17,6 +17,7 @@ interface ChatSectionProps {
     welcomeMessage: string;
     sendMessage: (content: string) => void;
     setActiveTab: (tab: "chat" | "stats") => void;
+    isModerator?: boolean;
 }
 
 export function ChatSection({
@@ -29,6 +30,7 @@ export function ChatSection({
     welcomeMessage,
     sendMessage,
     setActiveTab,
+    isModerator = false,
 }: ChatSectionProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -44,6 +46,8 @@ export function ChatSection({
     const currentWeather = useMemo(() => {
         return analyzeMessageMood(messages);
     }, [messages]);
+
+    const isLimitReached = !isModerator && conversationsToday >= 3;
 
     return (
         <div className="flex-1 flex flex-col min-h-0">
@@ -141,9 +145,9 @@ export function ChatSection({
                 <ChatInput
                     onSend={sendMessage}
                     isLoading={isLoading || isStreaming}
-                    disabled={conversationsToday >= 3}
+                    disabled={isLimitReached}
                     placeholder={
-                        conversationsToday >= 3
+                        isLimitReached
                             ? "Límite diario alcanzado. Vuelve mañana."
                             : "Escribe cómo te sientes..."
                     }
