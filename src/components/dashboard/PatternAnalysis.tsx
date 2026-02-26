@@ -34,7 +34,7 @@ export function PatternAnalysis({ data, isLoading }: PatternAnalysisProps) {
       <div className="therapy-card text-center py-8">
         <Lightbulb className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
         <p className="text-muted-foreground">
-          Los patrones se revelarán con más conversaciones
+          Los patrones se revelan automáticamente mientras conversas. Sigue compartiendo lo que sientes.
         </p>
       </div>
     );
