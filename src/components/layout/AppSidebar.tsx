@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, BarChart2, MessageCircle, LogOut, RotateCcw, Settings, Moon, Sun, User } from "lucide-react";
+import { Menu, X, BarChart2, MessageCircle, LogOut, Settings, Moon, Sun, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { UserProfile } from "@/types/therapy";
@@ -24,7 +24,7 @@ interface AppSidebarProps {
     theme: string | undefined;
     setTheme: (theme: string) => void;
     handleLogout: () => void;
-    handleResetChat: () => void;
+    handleResetChat: () => Promise<void>;
     updateProfile: (updates: { name?: string; age?: number }) => Promise<{ error: any }>;
     deleteAccount: () => Promise<{ error: any }>;
 }
@@ -44,6 +44,9 @@ export function AppSidebar({
     deleteAccount,
 }: AppSidebarProps) {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+    const isModerator = userProfile?.is_moderator ?? false;
+
     return (
         <>
             <button
@@ -116,17 +119,22 @@ export function AppSidebar({
                             </button>
                         </nav>
 
+                        {/* Conversation counter - show unlimited for moderator */}
                         <div className="p-4 border-t border-sidebar-border">
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-muted-foreground">Conversaciones hoy</span>
-                                <span className="font-medium">{conversationsToday}/3</span>
+                                <span className="font-medium">
+                                    {isModerator ? `${conversationsToday} ∞` : `${conversationsToday}/3`}
+                                </span>
                             </div>
-                            <div className="progress-track mt-2">
-                                <div
-                                    className="progress-fill bg-gradient-warm"
-                                    style={{ width: `${(conversationsToday / 3) * 100}%` }}
-                                />
-                            </div>
+                            {!isModerator && (
+                                <div className="progress-track mt-2">
+                                    <div
+                                        className="progress-fill bg-gradient-warm"
+                                        style={{ width: `${(conversationsToday / 3) * 100}%` }}
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         <div className="mt-auto p-4 border-t border-sidebar-border flex items-center justify-between">
@@ -138,9 +146,11 @@ export function AppSidebar({
                                     <span className="text-sm font-medium text-sidebar-foreground truncate max-w-[120px]">
                                         {userProfile?.name || "Usuario"}
                                     </span>
-                                    <span className="text-[10px] text-muted-foreground">
-                                        {conversationsToday}/3 conversaciones
-                                    </span>
+                                    {isModerator && (
+                                        <span className="text-[10px] text-orange-500 font-medium">
+                                            Desarrollador
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
@@ -172,13 +182,6 @@ export function AppSidebar({
                                         )}
                                     </DropdownMenuItem>
 
-                                    {userProfile?.is_moderator && (
-                                        <DropdownMenuItem onClick={handleResetChat}>
-                                            <RotateCcw className="mr-2 h-4 w-4" />
-                                            <span>Reiniciar chat (Debug)</span>
-                                        </DropdownMenuItem>
-                                    )}
-
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
                                         <LogOut className="mr-2 h-4 w-4" />
@@ -197,6 +200,7 @@ export function AppSidebar({
                 userProfile={userProfile}
                 onUpdate={updateProfile}
                 onDelete={deleteAccount}
+                onFullReset={isModerator ? handleResetChat : undefined}
             />
 
             {sidebarOpen && (
