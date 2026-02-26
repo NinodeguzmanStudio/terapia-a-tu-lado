@@ -22,9 +22,11 @@ export function TherapyApp() {
     userMessageCount,
     totalConversations,
     isLoadingHistory,
+    isModerator,
     sendMessage,
     loadChatHistory,
     resetChat,
+    fullReset,
     shouldTriggerAnalysis,
   } = useChat(userId, userProfile);
 
@@ -58,19 +60,14 @@ export function TherapyApp() {
     }
   }, [userId, loadChatHistory, loadSuggestions]);
 
-  // ──────────────────────────────────────────────
-  // FIXED: Analysis trigger — fires every 3rd user message,
-  // survives page reloads, and works across sessions.
-  // ──────────────────────────────────────────────
+  // Analysis trigger — fires every 3rd user message
   useEffect(() => {
-    // Only check after streaming is done (assistant has responded)
     if (isStreaming || isLoading) return;
     if (messages.length < 3) return;
 
     if (shouldTriggerAnalysis()) {
       runFullAnalysis(messages, (newSuggestions) => {
         setSuggestions(newSuggestions);
-        // Refresh profile to pick up streak/session updates from DB trigger
         refreshProfile();
         toast.success("Tu evaluación está lista", {
           description: "Tus patrones emocionales y pasos de crecimiento han sido actualizados.",
@@ -92,11 +89,14 @@ export function TherapyApp() {
     }
   }, [userMessageCount, isStreaming, isLoading]);
 
+  // Moderator: full reset — wipes ALL data to start from zero
   const handleResetChat = async () => {
     if (!userId || !userProfile?.is_moderator) return;
-    await resetChat();
+    await fullReset();
     await resetSuggestions();
     resetAnalysis();
+    await refreshProfile();
+    toast.success("Reset completo", { description: "Todos los datos fueron eliminados. Empieza de cero." });
   };
 
   const confirmedSuggestions = suggestions.filter(s => s.confirmed).length;
@@ -153,6 +153,7 @@ export function TherapyApp() {
             welcomeMessage={welcomeMessage}
             sendMessage={sendMessage}
             setActiveTab={setActiveTab}
+            isModerator={isModerator}
           />
         ) : (
           <DashboardSection
