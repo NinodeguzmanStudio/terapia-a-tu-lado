@@ -2,12 +2,24 @@ import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { EmotionData, AnalysisData, Message, Suggestion, HistoricalEmotion } from "@/types/therapy";
 
+export interface Achievement {
+    id: string;
+    type: string;
+    name: string;
+    icon: string;
+    earnedAt: Date;
+    level: number;
+    progressPercentage: number;
+}
+
 export function useAnalysis(userId: string | null) {
     const [emotionData, setEmotionData] = useState<EmotionData | null>(null);
     const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [historicalAnalysis, setHistoricalAnalysis] = useState<HistoricalEmotion[]>([]);
+    const [achievements, setAchievements] = useState<Achievement[]>([]);
 
+    // Fetch historical emotion analysis
     const fetchHistory = useCallback(async () => {
         if (!userId) return;
         const { data, error } = await supabase
@@ -19,6 +31,45 @@ export function useAnalysis(userId: string | null) {
 
         if (!error && data) {
             setHistoricalAnalysis(data);
+
+            // Also populate current emotion/analysis data from the latest entry
+            if (data.length > 0) {
+                const latest = data[data.length - 1];
+                setEmotionData({
+                    anxiety: latest.anxiety_percentage || 0,
+                    anger: latest.anger_percentage || 0,
+                    sadness: latest.sadness_percentage || 0,
+                    stability: latest.stability_percentage || 0,
+                    joy: latest.joy_percentage || 0,
+                });
+                setAnalysisData({
+                    main_trigger: latest.main_trigger || "",
+                    core_belief: latest.core_belief || "",
+                    evolution: latest.evolution_notes || "",
+                });
+            }
+        }
+    }, [userId]);
+
+    // Fetch achievements from user_achievements table
+    const fetchAchievements = useCallback(async () => {
+        if (!userId) return;
+        const { data, error } = await supabase
+            .from("user_achievements")
+            .select("*")
+            .eq("user_id", userId)
+            .order("earned_at", { ascending: false });
+
+        if (!error && data) {
+            setAchievements(data.map(a => ({
+                id: a.id,
+                type: a.achievement_type,
+                name: a.achievement_name,
+                icon: a.badge_icon || "award",
+                earnedAt: new Date(a.earned_at),
+                level: a.level || 1,
+                progressPercentage: a.progress_percentage || 0,
+            })));
         }
     }, [userId]);
 
@@ -43,8 +94,11 @@ export function useAnalysis(userId: string | null) {
 
             if (emotionResponse.data?.result) {
                 try {
-                    const parsed = JSON.parse(emotionResponse.data.result);
-                    const newEmotionData = {
+                    let rawResult = emotionResponse.data.result;
+                    // Clean markdown fences if present
+                    rawResult = rawResult.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+                    const parsed = JSON.parse(rawResult);
+                    const newEmotionData: EmotionData = {
                         anxiety: parsed.anxiety || 0,
                         anger: parsed.anger || 0,
                         sadness: parsed.sadness || 0,
@@ -74,16 +128,19 @@ export function useAnalysis(userId: string | null) {
                         evolution_notes: parsed.evolution,
                     });
 
-                    fetchHistory(); // Refresh history after new analysis
+                    // Refresh history after new analysis
+                    fetchHistory();
 
                 } catch (e) {
-                    console.error("Error parsing emotion analysis:", e);
+                    console.error("Error parsing emotion analysis:", e, "Raw:", emotionResponse.data.result);
                 }
             }
 
             if (suggestionsResponse.data?.result && userId) {
                 try {
-                    const parsed = JSON.parse(suggestionsResponse.data.result);
+                    let rawResult = suggestionsResponse.data.result;
+                    rawResult = rawResult.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+                    const parsed = JSON.parse(rawResult);
                     if (parsed.suggestions) {
                         const newSuggestions: Suggestion[] = parsed.suggestions.map((s: { text: string; category: string }) => ({
                             id: crypto.randomUUID(),
@@ -108,7 +165,7 @@ export function useAnalysis(userId: string | null) {
                         }
                     }
                 } catch (e) {
-                    console.error("Error parsing suggestions:", e);
+                    console.error("Error parsing suggestions:", e, "Raw:", suggestionsResponse.data.result);
                 }
             }
         } catch (error) {
@@ -118,12 +175,13 @@ export function useAnalysis(userId: string | null) {
         }
     }, [userId, fetchHistory]);
 
-    // Initial load of history
+    // Initial load of history + achievements
     useEffect(() => {
         if (userId) {
             fetchHistory();
+            fetchAchievements();
         }
-    }, [userId, fetchHistory]);
+    }, [userId, fetchHistory, fetchAchievements]);
 
     const resetAnalysis = useCallback(() => {
         setEmotionData(null);
@@ -133,10 +191,12 @@ export function useAnalysis(userId: string | null) {
     return {
         emotionData,
         analysisData,
-        historicalAnalysis, // Return history
+        historicalAnalysis,
+        achievements,
         isAnalyzing,
         runFullAnalysis,
-        fetchHistory, // Return fetch function
+        fetchHistory,
+        fetchAchievements,
         resetAnalysis,
     };
 }
