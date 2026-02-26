@@ -22,7 +22,6 @@ export function useUserProfile() {
             setUserProfile(profile);
         }
 
-        // Fetch active dates for calendar
         const { data: messages } = await supabase
             .from("chat_messages")
             .select("session_date")
@@ -45,9 +44,7 @@ export function useUserProfile() {
         setIsLoading(false);
     }, []);
 
-    // FIXED: Use onAuthStateChange to react to login/logout/session expiry
     useEffect(() => {
-        // Check initial session
         supabase.auth.getUser().then(({ data: { user } }) => {
             if (user) {
                 loadProfile(user.id);
@@ -56,7 +53,6 @@ export function useUserProfile() {
             }
         });
 
-        // Subscribe to auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
                 if (event === "SIGNED_IN" && session?.user) {
@@ -72,7 +68,6 @@ export function useUserProfile() {
         };
     }, [loadProfile, clearProfile]);
 
-    // Refresh profile data (useful after streak updates from trigger)
     const refreshProfile = useCallback(async () => {
         if (!userId) return;
         const { data: profile } = await supabase
@@ -102,6 +97,11 @@ export function useUserProfile() {
     const deleteAccount = async () => {
         if (!userId) return { error: new Error("No user") };
 
+        await supabase.from("chat_messages").delete().eq("user_id", userId);
+        await supabase.from("emotional_analysis").delete().eq("user_id", userId);
+        await supabase.from("daily_suggestions").delete().eq("user_id", userId);
+        await supabase.from("user_achievements").delete().eq("user_id", userId);
+
         const { error: profileError } = await supabase
             .from("profiles")
             .delete()
@@ -110,6 +110,7 @@ export function useUserProfile() {
         if (profileError) return { error: profileError };
 
         await supabase.auth.signOut();
+        clearProfile();
         return { error: null };
     };
 
