@@ -6,7 +6,9 @@ import { DailySuggestions } from "@/components/dashboard/DailySuggestions";
 import { StreakCalendar } from "@/components/dashboard/StreakCalendar";
 import { StreakRewards } from "@/components/dashboard/StreakRewards";
 import { EmotionTrendChart } from "@/components/dashboard/EmotionTrendChart";
+import { Achievements } from "@/components/dashboard/Achievements";
 import { UserProfile, EmotionData, AnalysisData, Suggestion, HistoricalEmotion } from "@/types/therapy";
+import { Achievement } from "@/hooks/useAnalysis";
 
 interface DashboardSectionProps {
     userProfile: UserProfile | null;
@@ -14,11 +16,36 @@ interface DashboardSectionProps {
     analysisData: AnalysisData | null;
     historicalAnalysis: HistoricalEmotion[];
     suggestions: Suggestion[];
+    achievements: Achievement[];
     isAnalyzing: boolean;
     activeDates: Date[];
     confirmedSuggestions: number;
     handleSuggestionToggle: (id: string, requireNote?: boolean) => void;
     handleAddNote: (id: string, note: string) => void;
+}
+
+/**
+ * Calculate overall progress (0-100) and level (1-5) from user activity.
+ */
+function calculateOverallProgress(
+    streak: number,
+    totalSessions: number,
+    confirmedSuggestions: number,
+    analysisCount: number,
+) {
+    const streakScore = Math.min(streak * 3, 30);
+    const sessionScore = Math.min(totalSessions * 2, 25);
+    const suggestionScore = Math.min(confirmedSuggestions * 5, 25);
+    const analysisScore = Math.min(analysisCount * 4, 20);
+    const total = Math.min(streakScore + sessionScore + suggestionScore + analysisScore, 100);
+
+    let level = 1;
+    if (total >= 80) level = 5;
+    else if (total >= 60) level = 4;
+    else if (total >= 40) level = 3;
+    else if (total >= 20) level = 2;
+
+    return { totalProgress: total, currentLevel: level };
 }
 
 export function DashboardSection({
@@ -27,12 +54,20 @@ export function DashboardSection({
     analysisData,
     historicalAnalysis,
     suggestions,
+    achievements,
     isAnalyzing,
     activeDates,
     confirmedSuggestions,
     handleSuggestionToggle,
     handleAddNote,
 }: DashboardSectionProps) {
+    const { totalProgress, currentLevel } = calculateOverallProgress(
+        userProfile?.streak_days || 0,
+        userProfile?.total_sessions || 0,
+        confirmedSuggestions,
+        historicalAnalysis.length,
+    );
+
     return (
         <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6">
             <div className="max-w-6xl mx-auto">
@@ -60,14 +95,23 @@ export function DashboardSection({
                         isLoading={isAnalyzing}
                     />
 
-                    {/* 3. Evolución — su progreso en el tiempo */}
+                    {/* 3. Logros e insignias — NUEVO: ahora integrado */}
+                    <Achievements
+                        achievements={achievements}
+                        currentLevel={currentLevel}
+                        totalProgress={totalProgress}
+                        streak={userProfile?.streak_days || 0}
+                        isLoading={isAnalyzing}
+                    />
+
+                    {/* 4. Evolución — su progreso en el tiempo */}
                     <EmotionTrendChart data={historicalAnalysis} isLoading={isAnalyzing} />
 
-                    {/* 4. Calendario y racha */}
+                    {/* 5. Calendario y racha */}
                     <StreakCalendar activeDates={activeDates} />
                     <StreakRewards currentStreak={userProfile?.streak_days || 0} />
 
-                    {/* 5. Planta AL FINAL — la recompensa visual */}
+                    {/* 6. Planta — la recompensa visual */}
                     <PlantProgress
                         confirmedSuggestions={confirmedSuggestions}
                         totalSuggestions={suggestions.length}
