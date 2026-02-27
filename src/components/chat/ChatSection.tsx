@@ -42,7 +42,6 @@ export function ChatSection({
         scrollToBottom();
     }, [messages]);
 
-    // Analyze mood from messages → determine weather automatically
     const currentWeather = useMemo(() => {
         return analyzeMessageMood(messages);
     }, [messages]);
@@ -51,7 +50,6 @@ export function ChatSection({
 
     return (
         <div className="flex-1 flex flex-col min-h-0">
-            {/* Header - always on top */}
             <header className="px-4 lg:px-8 py-4 border-b border-border bg-card/80 backdrop-blur-sm relative z-20">
                 <div className="max-w-3xl mx-auto flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-warm flex items-center justify-center">
@@ -66,14 +64,11 @@ export function ChatSection({
                 </div>
             </header>
 
-            {/* Chat area: relative container with weather behind + scrollable messages on top */}
             <div className="flex-1 relative overflow-hidden">
-                {/* Weather — absolute, fills container, behind everything */}
                 <div className="absolute inset-0 z-0">
                     <WeatherBackground weather={currentWeather} />
                 </div>
 
-                {/* Scrollable messages — on top of weather */}
                 <div className="absolute inset-0 z-10 overflow-y-auto px-4 lg:px-8 py-6">
                     <div className="max-w-3xl mx-auto">
                         {isLoadingHistory ? (
@@ -140,7 +135,6 @@ export function ChatSection({
                 </div>
             </div>
 
-            {/* Input - always on bottom */}
             <div className="max-w-3xl mx-auto w-full px-4 lg:px-0 relative z-20">
                 <ChatInput
                     onSend={sendMessage}
