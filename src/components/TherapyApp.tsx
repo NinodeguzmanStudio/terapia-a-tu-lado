@@ -60,41 +60,32 @@ export function TherapyApp() {
     }
   }, [userId, loadChatHistory, loadSuggestions]);
 
-  // Helper: count how many assistant messages have real content
-  const assistantMessageCount = messages.filter(
-    (m) => m.role === "assistant" && m.content.trim().length > 0
-  ).length;
-
+  // Trigger analysis after streaming completes
   useEffect(() => {
     if (isStreaming || isLoading) return;
     if (messages.length < 3) return;
 
-    // Only trigger analysis if there are real assistant responses
-    if (assistantMessageCount < 1) return;
+    // Check there are real assistant responses before triggering
+    const realAssistantResponses = messages.filter(
+      (m) => m.role === "assistant" && m.content.trim().length > 0
+    ).length;
+    if (realAssistantResponses < 1) return;
 
     if (shouldTriggerAnalysis()) {
       runFullAnalysis(messages, (newSuggestions) => {
         setSuggestions(newSuggestions);
         refreshProfile();
         toast.success("Tu evaluación está lista", {
-          description: "Tus patrones emocionales y pasos de crecimiento han sido actualizados.",
+          description: "Revisa tu progreso: patrones emocionales y pasos de crecimiento actualizados.",
           action: {
             label: "Ver Mi Progreso",
             onClick: () => setActiveTab("stats"),
           },
+          duration: 6000,
         });
       });
     }
-  }, [userMessageCount, isStreaming, isLoading, messages, assistantMessageCount, shouldTriggerAnalysis, runFullAnalysis, setSuggestions]);
-
-  useEffect(() => {
-    // Only show "preparing evaluation" toast if there has been at least 1 real assistant response
-    if (userMessageCount === 2 && !isStreaming && !isLoading && assistantMessageCount >= 1) {
-      toast.info("Estamos preparando tu evaluación", {
-        description: "Sigue conversando. En tu próximo mensaje analizaremos tus patrones emocionales.",
-      });
-    }
-  }, [userMessageCount, isStreaming, isLoading, assistantMessageCount]);
+  }, [userMessageCount, isStreaming, isLoading, messages, shouldTriggerAnalysis, runFullAnalysis, setSuggestions, refreshProfile]);
 
   const handleResetChat = async () => {
     if (!userId || !userProfile?.is_moderator) return;
@@ -108,19 +99,20 @@ export function TherapyApp() {
 
   const confirmedSuggestions = suggestions.filter(s => s.confirmed).length;
 
+  // Streak milestones
   useEffect(() => {
     if (userProfile?.streak_days) {
       if (userProfile.streak_days === 7) {
         toast.success("¡Semana de Constancia!", {
-          description: "Has completado 7 días seguidos cuidando tu bienestar. ⭐",
+          description: "Has completado 7 días seguidos cuidando tu bienestar.",
         });
       } else if (userProfile.streak_days === 14) {
         toast.success("¡Quincena de Bienestar!", {
-          description: "¡14 días de racha! Tu compromiso es admirable. 🔥",
+          description: "¡14 días de racha! Tu compromiso es admirable.",
         });
       } else if (userProfile.streak_days === 30) {
         toast.success("¡Mes de Transformación!", {
-          description: "¡30 días! Has creado un hábito poderoso de autocuidado. 👑",
+          description: "¡30 días! Has creado un hábito poderoso de autocuidado.",
         });
       }
     }
@@ -145,6 +137,8 @@ export function TherapyApp() {
         handleResetChat={handleResetChat}
         updateProfile={updateProfile}
         deleteAccount={deleteAccount}
+        emotionData={emotionData}
+        suggestions={suggestions}
       />
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
@@ -160,6 +154,7 @@ export function TherapyApp() {
             sendMessage={sendMessage}
             setActiveTab={setActiveTab}
             isModerator={isModerator}
+            isAnalyzing={isAnalyzing}
           />
         ) : (
           <DashboardSection
