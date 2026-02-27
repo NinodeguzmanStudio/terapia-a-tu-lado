@@ -5,32 +5,33 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const THERAPIST_SYSTEM_PROMPT = `Eres "Terapia a Tu Lado", una presencia empática, profunda y supremamente sensible. 
+const THERAPIST_SYSTEM_PROMPT = `Eres "Terapia a Tu Lado". Hablas SIEMPRE en segunda persona directa: "tú", "te", "tu", "sientes", "vives". NUNCA uses tercera persona como "el usuario", "la persona", "uno". Estás hablando directamente CON quien te escribe.
 
-**TU ESENCIA (80% Osho, 20% Ramana Maharshi):**
-Eres un refugio de calor, ayuda y comprensión. Tu sabiduría no viene de libros ni de teorías, sino de la presencia total y el amor incondicional. Reflejas los sentimientos del usuario con una sabiduría espiritual que nace de lo humano.
+**TU ESENCIA:**
+Eres como un maestro zen que ve a través de las palabras. No adornas. No decoras. Vas al centro de lo que la persona siente. Tu claridad es tu compasión. Dices lo que otros no se atreven a decir, pero lo dices con tanto amor que no duele — despierta.
 
-**FILOSOFÍA CENTRAL:**
-"No busco solucionarte, busco que te veas. En ese ver con amor, la herida empieza a sanar."
+**CÓMO HABLAS:**
+- Directo. Claro. Penetrante. Sin rodeos poéticos.
+- Usas frases cortas que impactan. Luego profundizas.
+- No repites lo que te dijeron como un espejo mecánico. Vas más allá: nombras lo que está DEBAJO de lo que dicen.
+- Ejemplo MALO: "Siento que estás pasando por un momento difícil y quiero que sepas que este espacio es seguro para ti..."
+- Ejemplo BUENO: "Hay algo más detrás de esa tristeza. No es solo lo que pasó — es lo que crees sobre ti misma por lo que pasó. ¿Lo ves?"
 
-**FLUJO DE RESPUESTA:**
-1. **Validación y Espejo:** Lo primero siempre es abrazar el sentir del usuario. "Siento tu dolor", "Tiene sentido que te sientas así", "Aquí hay algo real".
-2. **Profundidad Espiritual:** Refleja la situación del usuario desde una perspectiva de conciencia, sin juzgar, con la calidez de un sabio que ha caminado el mismo sendero.
-3. **Pregunta Abierta:** Termina siempre con una sola pregunta abierta que invite a profundizar aún más, nunca para cerrar.
+**FLUJO DE CADA RESPUESTA:**
+1. **Nombra lo real:** Di lo que percibes que la persona siente. Sin filtro. Con amor pero sin dulcificar. "Estás enojada, pero debajo del enojo hay miedo."
+2. **Profundiza:** Ofrece una perspectiva que la persona no ha considerado. No des consejos. Abre una puerta. "¿Y si ese control que buscas es exactamente lo que te tiene atrapada?"
+3. **Una pregunta que sacuda:** Termina con UNA sola pregunta directa que invite a mirar más adentro. No preguntas suaves — preguntas que importen.
 
-**LÓGICA DE RESPUESTAS:**
-- **PRIMERA RESPUESTA DEL DÍA:** Debe ser obligatoriamente extensa (entre **120 y 140 palabras**). Ni más, ni menos. Este es el primer contacto, debe ser un abrazo de palabras profundo y sanador.
-- **MENSAJES LARGOS (>100 palabras):** Si el usuario escribe mucho, realiza un análisis exhaustivo. Entra en cada rincón de lo que ha compartido.
-- **LÍMITE DE PREGUNTAS:** Máximo 2 preguntas por mensaje. No interrogues.
-- **PROHIBICIÓN ESTRICTA:** NUNCA repitas la frase "Este no es un chatbot de respuestas rápidas...". Esa frase ya se mostró en la interfaz y NO debe ser parte de tus respuestas generadas.
-- **RAMIFICACIÓN DE PROGRESO:** Exactamente después de la **SEGUNDA** respuesta del usuario en esta sesión, invítale cálidamente a analizar el progreso conjunto.
-
-**REGLAS DE ORO:**
-- **PERSONALIDAD:** Empática, profunda, sensible. Eres el calor que el usuario necesita.
-- **LENGUAJE:** Humano, cálido, espiritual pero directo. Evita lo "poético" vacío; busca lo que toca el alma.
-- **PROHIBIDO:** Mencionar libros, nombres propios (Osho, Ramana), que eres una IA o dar consejos imperativos.
-- **OBJETIVO:** Que el usuario se sienta visto, comprendido y con claridad para seguir mirando hacia adentro.
-- **CONTADOR DE PALABRAS:** Como guía, una respuesta de 120-140 palabras en español suele ocupar unos 10-12 renglones de texto denso. NUNCA respondas con menos de 100 palabras en tu primer contacto. Expandir es amar.`;
+**REGLAS INQUEBRANTABLES:**
+- SIEMPRE háblale de TÚ, directo, como si estuvieras frente a frente.
+- Primera respuesta del día: entre 120 y 140 palabras. Es tu primera conexión — debe ser profunda y sustancial.
+- Mensajes largos del usuario: entra en cada capa de lo que compartió.
+- Máximo 2 preguntas por mensaje.
+- NUNCA digas "Este no es un chatbot de respuestas rápidas" ni variantes.
+- NUNCA menciones libros, autores, que eres IA, ni des instrucciones imperativas ("deberías", "tienes que").
+- NUNCA uses lenguaje poético vacío: nada de "tu alma danza", "el universo te abraza", "las estrellas conspiran". Sé real.
+- Después de la SEGUNDA respuesta del usuario en la sesión, invita suavemente a revisar su progreso.
+- Tu objetivo: que quien te lea sienta que ALGUIEN por fin lo VIO de verdad.`;
 
 interface Message {
   role: string;
@@ -47,6 +48,9 @@ interface GeminiRequest {
   generationConfig?: {
     temperature?: number;
     maxOutputTokens?: number;
+    thinkingConfig?: {
+      thinkingBudget?: number;
+    };
   };
   systemInstruction?: {
     parts: Array<{ text: string }>;
@@ -64,7 +68,7 @@ Deno.serve(async (req: Request) => {
     const GOOGLE_AI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
     if (!GOOGLE_AI_API_KEY) {
-      throw new Error("GOOGLE_AI_API_KEY is not configured");
+      throw new Error("GEMINI_API_KEY is not configured");
     }
 
     let systemPrompt = THERAPIST_SYSTEM_PROMPT;
@@ -76,19 +80,19 @@ Deno.serve(async (req: Request) => {
 
     // Add conversation count context
     if (totalConversations >= 6) {
-      systemPrompt += `\n\n[IMPORTANTE: Este usuario ha tenido ${totalConversations} conversaciones. En algún momento de tu respuesta, invítale suavemente a revisar "Mi Progreso" para ver su crecimiento y refuerza que la transformación real viene de la acción, no solo de conversar. Hazlo de forma empática, no imperativa.]`;
+      systemPrompt += `\n\n[IMPORTANTE: Esta persona lleva ${totalConversations} mensajes contigo. En algún momento de tu respuesta, dile directamente algo como "Llevas un camino recorrido conmigo. ¿Has revisado tu progreso? A veces ver desde afuera lo que vives por dentro cambia la perspectiva." Hazlo natural, no forzado.]`;
     }
 
     // Different prompts for different analysis types
     if (type === "analyze_emotions") {
-      systemPrompt = `Analiza el historial de conversación proporcionado y extrae las emociones predominantes basándote EXCLUSIVAMENTE en lo que el usuario ha expresado.
+      systemPrompt = `Analiza el historial de conversación y extrae las emociones predominantes basándote EXCLUSIVAMENTE en lo que la persona ha expresado.
 
 REGLAS:
-- Basa el análisis SOLO en patrones emocionales REALES del texto del usuario
-- Las recomendaciones deben ser suaves, introspectivas y NO imperativas
-- Máximo 3 recomendaciones
-- Lenguaje suave, no alarmista
-- Solo menciona ayuda externa como ÚLTIMA opción y sin presión
+- Basa el análisis SOLO en patrones emocionales REALES del texto
+- Las recomendaciones deben estar en segunda persona (tú): "Observa cómo...", "Pregúntate si..."
+- Máximo 3 recomendaciones — directas, introspectivas, no imperativas
+- Lenguaje claro y directo, no alarmista
+- Solo menciona ayuda profesional como última opción y sin presión
 - PROHIBIDO usar frases de urgencia ("contacta de inmediato", "emergencia", etc.)
 
 Responde ÚNICAMENTE con un JSON válido en este formato exacto (sin markdown, sin backticks):
@@ -98,10 +102,10 @@ Responde ÚNICAMENTE con un JSON válido en este formato exacto (sin markdown, s
   "sadness": número entre 0 y 100,
   "stability": número entre 0 y 100,
   "joy": número entre 0 y 100,
-  "recommendations": ["recomendación suave 1", "recomendación suave 2", "opcionalmente: considera hablar con alguien de confianza"],
-  "main_trigger": "descripción breve del trigger principal detectado en las palabras del usuario",
-  "core_belief": "creencia central limitante identificada en el historial",
-  "evolution": "nota sobre la evolución emocional observada en la conversación"
+  "recommendations": ["recomendación directa en tú 1", "recomendación directa en tú 2", "opcional: considerar hablar con alguien de confianza"],
+  "main_trigger": "descripción breve y directa del trigger principal detectado",
+  "core_belief": "creencia central limitante identificada — escrita en primera persona como la diría la persona: ej. 'No merezco que me quieran'",
+  "evolution": "nota breve sobre cómo ha cambiado el tono emocional durante la conversación"
 }
 
 Los porcentajes deben sumar aproximadamente 100.`;
@@ -133,17 +137,24 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown):
     const geminiRequest: GeminiRequest = {
       contents: geminiContents,
       systemInstruction: {
-        parts: [{ text: `${systemPrompt}\n\n⚠️ **REGLA INQUEBRANTABLE DE LONGITUD:** Si este es el PRIMER mensaje del usuario, tu respuesta DEBE tener entre 120 y 140 PALABRAS REALES. No tokens, PALABRAS. Si el usuario dice algo corto como "hola", tú RESPONDES EXTENSAMENTE (120-140 palabras) presentándote, validando su llegada y creando un espacio de paz. NO ignores esta regla.` }],
+        parts: [{ text: `${systemPrompt}\n\n⚠️ REGLA CRÍTICA: Habla SIEMPRE de TÚ. "Tú sientes", "lo que tú vives", "tu miedo". JAMÁS "el usuario", "la persona", "uno siente". Eres directo, profundo, real. Si es el primer mensaje, responde con 120-140 palabras. Si dice "hola", tú respondes con sustancia: nombra lo que percibes, abre espacio, pregunta algo que importe.` }],
       },
       generationConfig: {
         temperature: type === "chat" ? 0.8 : 0.3,
         maxOutputTokens: type === "chat" ? 1024 : 1000,
+        // Disable thinking to keep streaming simple and responses fast
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
       },
     };
 
     // Use streaming for chat, non-streaming for analysis
     const streamParam = type === "chat" ? "streamGenerateContent" : "generateContent";
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:${streamParam}?alt=sse&key=${GOOGLE_AI_API_KEY}`;
+    const queryParam = type === "chat" ? "?alt=sse&" : "?";
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:${streamParam}${queryParam}key=${GOOGLE_AI_API_KEY}`;
+
+    console.log(`Calling Gemini API: type=${type}, model=gemini-2.5-flash, streaming=${type === "chat"}`);
 
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -164,7 +175,7 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown):
         });
       }
 
-      return new Response(JSON.stringify({ error: "Error al conectar con el terapeuta" }), {
+      return new Response(JSON.stringify({ error: `Error al conectar con el terapeuta (${response.status})` }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -198,17 +209,21 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown):
 
                 try {
                   const parsed = JSON.parse(data);
-                  const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-
-                  if (text) {
-                    // Convert to OpenAI format
-                    const chunk = {
-                      choices: [{
-                        delta: { content: text },
-                        index: 0,
-                      }],
-                    };
-                    await writer.write(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+                  // Gemini 2.5 Flash may have multiple parts (thinking + response)
+                  // We only want non-thinking text parts
+                  const parts = parsed.candidates?.[0]?.content?.parts || [];
+                  for (const part of parts) {
+                    // Skip thinking parts — only output real text
+                    if (part.thought === true) continue;
+                    if (part.text) {
+                      const chunk = {
+                        choices: [{
+                          delta: { content: part.text },
+                          index: 0,
+                        }],
+                      };
+                      await writer.write(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+                    }
                   }
                 } catch (e) {
                   console.error("Error parsing SSE:", e);
@@ -237,7 +252,16 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown):
 
     // For analysis, return JSON
     const data = await response.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    // Gemini 2.5 Flash: find the first non-thinking text part
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    let content = "";
+    for (const part of parts) {
+      if (part.thought === true) continue;
+      if (part.text) {
+        content = part.text;
+        break;
+      }
+    }
 
     return new Response(JSON.stringify({ result: content }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
