@@ -1,6 +1,6 @@
 import { useRef, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { Sparkles, BarChart2 } from "lucide-react";
 import { ChatMessage } from "@/components/chat/ChatMessage";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -18,6 +18,7 @@ interface ChatSectionProps {
     sendMessage: (content: string) => void;
     setActiveTab: (tab: "chat" | "stats") => void;
     isModerator?: boolean;
+    isAnalyzing?: boolean;
 }
 
 export function ChatSection({
@@ -31,6 +32,7 @@ export function ChatSection({
     sendMessage,
     setActiveTab,
     isModerator = false,
+    isAnalyzing = false,
 }: ChatSectionProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -48,32 +50,43 @@ export function ChatSection({
 
     const isLimitReached = !isModerator && conversationsToday >= 3;
 
-    // Count real assistant responses (with actual content)
+    // Only show progress banner when real conversation exists
     const realAssistantResponses = messages.filter(
         (m) => m.role === "assistant" && m.content.trim().length > 0
     ).length;
-
-    // Only show progress banner if there have been real back-and-forth conversations
     const showProgressBanner =
         totalConversations >= 6 &&
         realAssistantResponses >= 1 &&
         messages.length > 0 &&
-        messages[messages.length - 1]?.role === "assistant" &&
-        messages[messages.length - 1]?.content.trim().length > 0;
+        messages[messages.length - 1]?.role === "assistant";
 
     return (
         <div className="flex-1 flex flex-col min-h-0">
             <header className="px-4 lg:px-8 py-4 border-b border-border bg-card/80 backdrop-blur-sm relative z-20">
-                <div className="max-w-3xl mx-auto flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-warm flex items-center justify-center">
-                        <Sparkles className="h-5 w-5 text-white" />
+                <div className="max-w-3xl mx-auto flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-warm flex items-center justify-center">
+                            <Sparkles className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                            <h2 className="font-serif text-lg">Tu Terapeuta</h2>
+                            <p className="text-xs text-muted-foreground">
+                                {isStreaming ? "Escribiendo..." : isAnalyzing ? "Analizando patrones..." : "En línea"}
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <h2 className="font-serif text-lg">Tu Terapeuta</h2>
-                        <p className="text-xs text-muted-foreground">
-                            {isStreaming ? "Escribiendo..." : "En línea"}
-                        </p>
-                    </div>
+
+                    {/* Analysis indicator */}
+                    {isAnalyzing && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-full"
+                        >
+                            <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                            <span className="text-xs text-primary font-medium">Evaluando</span>
+                        </motion.div>
+                    )}
                 </div>
             </header>
 
@@ -125,17 +138,19 @@ export function ChatSection({
                                     <motion.div
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        className="mt-4 p-4 bg-card/70 backdrop-blur-sm rounded-xl text-center border border-border/50"
+                                        className="mt-4 p-4 bg-card/70 backdrop-blur-sm rounded-xl border border-primary/20 flex items-center gap-3"
                                     >
-                                        <p className="text-sm text-muted-foreground">
-                                            Has tenido varias conversaciones profundas.
+                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                            <BarChart2 className="h-4 w-4 text-primary" />
+                                        </div>
+                                        <p className="text-sm text-muted-foreground flex-1">
+                                            Tienes datos de progreso disponibles.
                                             <button
                                                 onClick={() => setActiveTab("stats")}
-                                                className="text-primary hover:underline ml-1"
+                                                className="text-primary font-medium hover:underline ml-1"
                                             >
-                                                Revisa tu progreso
+                                                Ver mi progreso
                                             </button>
-                                            {" "}para ver tus pasos de crecimiento y cómo florece tu planta.
                                         </p>
                                     </motion.div>
                                 )}
