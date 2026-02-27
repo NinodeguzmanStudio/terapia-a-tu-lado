@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { EmotionData, AnalysisData, Message, Suggestion, HistoricalEmotion } from "@/types/therapy";
+import { callGemini } from "@/lib/gemini";
 
 export interface Achievement {
     id: string;
@@ -27,25 +28,6 @@ interface AchievementStats {
     analysisCount: number;
     streak: number;
     completedSuggestions: number;
-}
-
-// Helper: llama a /api/therapy-chat (Vercel) en vez de Supabase Edge Function
-async function callTherapyApi(body: Record<string, unknown>): Promise<{ result?: string; error?: string }> {
-    try {
-        const response = await fetch("/api/therapy-chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-        });
-        if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
-            return { error: err.error || `Error ${response.status}` };
-        }
-        return await response.json();
-    } catch (e) {
-        console.error("callTherapyApi error:", e);
-        return { error: e instanceof Error ? e.message : "Error de red" };
-    }
 }
 
 export function useAnalysis(userId: string | null) {
@@ -140,93 +122,81 @@ export function useAnalysis(userId: string | null) {
 
         setIsAnalyzing(true);
         const chatHistory = messages.map((m) => ({
-            role: m.role,
+            role: m.role as "user" | "assistant",
             content: m.content,
         }));
 
         try {
-            // STEP 1: Analyze emotions — ahora via Vercel API
-            const emotionResponse = await callTherapyApi({
-                messages: chatHistory,
-                type: "analyze_emotions",
-            });
+            // STEP 1: Analyze emotions via Vercel serverless
+            try {
+                const emotionResult = await callGemini(chatHistory, "analyze_emotions");
+                const cleaned = emotionResult.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+                const parsed = JSON.parse(cleaned);
 
-            if (emotionResponse.result) {
-                try {
-                    let rawResult = emotionResponse.result;
-                    rawResult = rawResult.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-                    const parsed = JSON.parse(rawResult);
-                    const newEmotionData: EmotionData = {
-                        anxiety: parsed.anxiety || 0,
-                        anger: parsed.anger || 0,
-                        sadness: parsed.sadness || 0,
-                        stability: parsed.stability || 0,
-                        joy: parsed.joy || 0,
-                        recommendations: parsed.recommendations || [],
-                    };
+                const newEmotionData: EmotionData = {
+                    anxiety: parsed.anxiety || 0,
+                    anger: parsed.anger || 0,
+                    sadness: parsed.sadness || 0,
+                    stability: parsed.stability || 0,
+                    joy: parsed.joy || 0,
+                    recommendations: parsed.recommendations || [],
+                };
 
-                    setEmotionData(newEmotionData);
-                    setAnalysisData({
-                        main_trigger: parsed.main_trigger || "",
-                        core_belief: parsed.core_belief || "",
-                        evolution: parsed.evolution || "",
-                    });
+                setEmotionData(newEmotionData);
+                setAnalysisData({
+                    main_trigger: parsed.main_trigger || "",
+                    core_belief: parsed.core_belief || "",
+                    evolution: parsed.evolution || "",
+                });
 
-                    await supabase.from("emotional_analysis").insert({
-                        user_id: userId,
-                        analysis_date: new Date().toISOString().split('T')[0],
-                        anxiety_percentage: newEmotionData.anxiety,
-                        anger_percentage: newEmotionData.anger,
-                        sadness_percentage: newEmotionData.sadness,
-                        stability_percentage: newEmotionData.stability,
-                        joy_percentage: newEmotionData.joy,
-                        main_trigger: parsed.main_trigger,
-                        core_belief: parsed.core_belief,
-                        evolution_notes: parsed.evolution,
-                    });
+                await supabase.from("emotional_analysis").insert({
+                    user_id: userId,
+                    analysis_date: new Date().toISOString().split('T')[0],
+                    anxiety_percentage: newEmotionData.anxiety,
+                    anger_percentage: newEmotionData.anger,
+                    sadness_percentage: newEmotionData.sadness,
+                    stability_percentage: newEmotionData.stability,
+                    joy_percentage: newEmotionData.joy,
+                    main_trigger: parsed.main_trigger,
+                    core_belief: parsed.core_belief,
+                    evolution_notes: parsed.evolution,
+                });
 
-                    await fetchHistory();
-                } catch (e) {
-                    console.error("Error parsing emotion analysis:", e);
-                }
+                await fetchHistory();
+            } catch (e) {
+                console.error("Error in emotion analysis:", e);
             }
 
-            // STEP 2: Generate suggestions — ahora via Vercel API
-            const suggestionsResponse = await callTherapyApi({
-                messages: chatHistory,
-                type: "generate_suggestions",
-            });
+            // STEP 2: Generate suggestions via Vercel serverless
+            try {
+                const sugResult = await callGemini(chatHistory, "generate_suggestions");
+                const cleaned = sugResult.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+                const parsed = JSON.parse(cleaned);
 
-            if (suggestionsResponse.result && userId) {
-                try {
-                    let rawResult = suggestionsResponse.result;
-                    rawResult = rawResult.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-                    const parsed = JSON.parse(rawResult);
-                    if (parsed.suggestions) {
-                        const newSuggestions: Suggestion[] = parsed.suggestions.map((s: { text: string; category: string }) => ({
-                            id: crypto.randomUUID(),
-                            text: s.text,
+                if (parsed.suggestions) {
+                    const newSuggestions: Suggestion[] = parsed.suggestions.map((s: { text: string; category: string }) => ({
+                        id: crypto.randomUUID(),
+                        text: s.text,
+                        category: s.category,
+                        isCompleted: false,
+                        confirmed: false,
+                    }));
+
+                    onSuggestionsGenerated(newSuggestions);
+
+                    for (const s of newSuggestions) {
+                        await supabase.from("daily_suggestions").insert({
+                            id: s.id,
+                            user_id: userId,
+                            suggestion_text: s.text,
                             category: s.category,
-                            isCompleted: false,
+                            is_completed: false,
                             confirmed: false,
-                        }));
-
-                        onSuggestionsGenerated(newSuggestions);
-
-                        for (const s of newSuggestions) {
-                            await supabase.from("daily_suggestions").insert({
-                                id: s.id,
-                                user_id: userId,
-                                suggestion_text: s.text,
-                                category: s.category,
-                                is_completed: false,
-                                confirmed: false,
-                            });
-                        }
+                        });
                     }
-                } catch (e) {
-                    console.error("Error parsing suggestions:", e);
                 }
+            } catch (e) {
+                console.error("Error in suggestions:", e);
             }
 
             // STEP 3: Check achievements
