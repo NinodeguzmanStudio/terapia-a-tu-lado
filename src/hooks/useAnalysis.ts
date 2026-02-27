@@ -12,7 +12,6 @@ export interface Achievement {
     progressPercentage: number;
 }
 
-// Achievement definitions
 const ACHIEVEMENT_DEFINITIONS = [
     { type: "first_session", name: "Primera Sesión", icon: "heart", check: (stats: AchievementStats) => stats.totalSessions >= 1 },
     { type: "deep_talk", name: "Conversación Profunda", icon: "zap", check: (stats: AchievementStats) => stats.totalMessages >= 6 },
@@ -28,6 +27,25 @@ interface AchievementStats {
     analysisCount: number;
     streak: number;
     completedSuggestions: number;
+}
+
+// Helper: llama a /api/therapy-chat (Vercel) en vez de Supabase Edge Function
+async function callTherapyApi(body: Record<string, unknown>): Promise<{ result?: string; error?: string }> {
+    try {
+        const response = await fetch("/api/therapy-chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            return { error: err.error || `Error ${response.status}` };
+        }
+        return await response.json();
+    } catch (e) {
+        console.error("callTherapyApi error:", e);
+        return { error: e instanceof Error ? e.message : "Error de red" };
+    }
 }
 
 export function useAnalysis(userId: string | null) {
@@ -48,7 +66,6 @@ export function useAnalysis(userId: string | null) {
 
         if (!error && data) {
             setHistoricalAnalysis(data);
-
             if (data.length > 0) {
                 const latest = data[data.length - 1];
                 setEmotionData({
@@ -88,7 +105,6 @@ export function useAnalysis(userId: string | null) {
         }
     }, [userId]);
 
-    // Check and grant new achievements
     const checkAchievements = useCallback(async (stats: AchievementStats) => {
         if (!userId) return;
 
@@ -116,7 +132,6 @@ export function useAnalysis(userId: string | null) {
         await fetchAchievements();
     }, [userId, fetchAchievements]);
 
-    // Run analysis SEQUENTIALLY to avoid timeout
     const runFullAnalysis = useCallback(async (
         messages: Message[],
         onSuggestionsGenerated: (suggestions: Suggestion[]) => void
@@ -130,14 +145,15 @@ export function useAnalysis(userId: string | null) {
         }));
 
         try {
-            // STEP 1: Analyze emotions (sequential, NOT parallel)
-            const emotionResponse = await supabase.functions.invoke("therapy-chat", {
-                body: { messages: chatHistory, type: "analyze_emotions" },
+            // STEP 1: Analyze emotions — ahora via Vercel API
+            const emotionResponse = await callTherapyApi({
+                messages: chatHistory,
+                type: "analyze_emotions",
             });
 
-            if (emotionResponse.data?.result) {
+            if (emotionResponse.result) {
                 try {
-                    let rawResult = emotionResponse.data.result;
+                    let rawResult = emotionResponse.result;
                     rawResult = rawResult.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
                     const parsed = JSON.parse(rawResult);
                     const newEmotionData: EmotionData = {
@@ -175,14 +191,15 @@ export function useAnalysis(userId: string | null) {
                 }
             }
 
-            // STEP 2: Generate suggestions (after emotions complete)
-            const suggestionsResponse = await supabase.functions.invoke("therapy-chat", {
-                body: { messages: chatHistory, type: "generate_suggestions" },
+            // STEP 2: Generate suggestions — ahora via Vercel API
+            const suggestionsResponse = await callTherapyApi({
+                messages: chatHistory,
+                type: "generate_suggestions",
             });
 
-            if (suggestionsResponse.data?.result && userId) {
+            if (suggestionsResponse.result && userId) {
                 try {
-                    let rawResult = suggestionsResponse.data.result;
+                    let rawResult = suggestionsResponse.result;
                     rawResult = rawResult.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
                     const parsed = JSON.parse(rawResult);
                     if (parsed.suggestions) {
@@ -212,7 +229,7 @@ export function useAnalysis(userId: string | null) {
                 }
             }
 
-            // STEP 3: Check for new achievements
+            // STEP 3: Check achievements
             const { count: msgCount } = await supabase
                 .from("chat_messages")
                 .select("*", { count: "exact", head: true })
