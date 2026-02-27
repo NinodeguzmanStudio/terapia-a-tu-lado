@@ -60,30 +60,26 @@ export function TherapyApp() {
     }
   }, [userId, loadChatHistory, loadSuggestions]);
 
-  // FIX BUG #5: Ref para el timer de análisis (cleanup correcto)
+  // FIX: Ref para el timer de análisis
   const analysisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Trigger analysis after streaming completes
-  // FIX BUG #5: Delay de 5 segundos antes de analizar para evitar saturar Gemini API
+  // FIX: Delay de 8 segundos para no saturar Gemini API
   useEffect(() => {
     if (isStreaming || isLoading) return;
     if (messages.length < 3) return;
 
-    // Check there are real assistant responses before triggering
     const realAssistantResponses = messages.filter(
       (m) => m.role === "assistant" && m.content.trim().length > 0
     ).length;
     if (realAssistantResponses < 1) return;
 
     if (shouldTriggerAnalysis()) {
-      // Limpiar timer anterior si existe
       if (analysisTimerRef.current) {
         clearTimeout(analysisTimerRef.current);
       }
 
-      // FIX: Esperar 5 segundos antes de ejecutar análisis
-      // Esto evita que las llamadas de análisis (2 requests a Gemini)
-      // compitan con la respuesta del chat y activen rate limiting
+      // Esperar 8 segundos antes de analizar para no competir con el chat
       analysisTimerRef.current = setTimeout(() => {
         runFullAnalysis(messages, (newSuggestions) => {
           setSuggestions(newSuggestions);
@@ -97,10 +93,9 @@ export function TherapyApp() {
             duration: 6000,
           });
         });
-      }, 5000);
+      }, 8000);
     }
 
-    // Cleanup: cancelar timer si el componente se desmonta o deps cambian
     return () => {
       if (analysisTimerRef.current) {
         clearTimeout(analysisTimerRef.current);
