@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "next-themes";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useChat } from "@/hooks/useChat";
@@ -60,7 +60,11 @@ export function TherapyApp() {
     }
   }, [userId, loadChatHistory, loadSuggestions]);
 
+  // FIX BUG #5: Ref para el timer de análisis (cleanup correcto)
+  const analysisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Trigger analysis after streaming completes
+  // FIX BUG #5: Delay de 5 segundos antes de analizar para evitar saturar Gemini API
   useEffect(() => {
     if (isStreaming || isLoading) return;
     if (messages.length < 3) return;
@@ -72,19 +76,36 @@ export function TherapyApp() {
     if (realAssistantResponses < 1) return;
 
     if (shouldTriggerAnalysis()) {
-      runFullAnalysis(messages, (newSuggestions) => {
-        setSuggestions(newSuggestions);
-        refreshProfile();
-        toast.success("Tu evaluación está lista", {
-          description: "Revisa tu progreso: patrones emocionales y pasos de crecimiento actualizados.",
-          action: {
-            label: "Ver Mi Progreso",
-            onClick: () => setActiveTab("stats"),
-          },
-          duration: 6000,
+      // Limpiar timer anterior si existe
+      if (analysisTimerRef.current) {
+        clearTimeout(analysisTimerRef.current);
+      }
+
+      // FIX: Esperar 5 segundos antes de ejecutar análisis
+      // Esto evita que las llamadas de análisis (2 requests a Gemini)
+      // compitan con la respuesta del chat y activen rate limiting
+      analysisTimerRef.current = setTimeout(() => {
+        runFullAnalysis(messages, (newSuggestions) => {
+          setSuggestions(newSuggestions);
+          refreshProfile();
+          toast.success("Tu evaluación está lista", {
+            description: "Revisa tu progreso: patrones emocionales y pasos de crecimiento actualizados.",
+            action: {
+              label: "Ver Mi Progreso",
+              onClick: () => setActiveTab("stats"),
+            },
+            duration: 6000,
+          });
         });
-      });
+      }, 5000);
     }
+
+    // Cleanup: cancelar timer si el componente se desmonta o deps cambian
+    return () => {
+      if (analysisTimerRef.current) {
+        clearTimeout(analysisTimerRef.current);
+      }
+    };
   }, [userMessageCount, isStreaming, isLoading, messages, shouldTriggerAnalysis, runFullAnalysis, setSuggestions, refreshProfile]);
 
   const handleResetChat = async () => {
