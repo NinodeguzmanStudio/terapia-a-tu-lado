@@ -12,6 +12,24 @@ export interface Achievement {
     progressPercentage: number;
 }
 
+// Achievement definitions
+const ACHIEVEMENT_DEFINITIONS = [
+    { type: "first_session", name: "Primera Sesión", icon: "heart", check: (stats: AchievementStats) => stats.totalSessions >= 1 },
+    { type: "deep_talk", name: "Conversación Profunda", icon: "zap", check: (stats: AchievementStats) => stats.totalMessages >= 6 },
+    { type: "self_aware", name: "Autoconocimiento", icon: "star", check: (stats: AchievementStats) => stats.analysisCount >= 2 },
+    { type: "consistent", name: "Constancia", icon: "flame", check: (stats: AchievementStats) => stats.streak >= 3 },
+    { type: "growth_steps", name: "Pasos de Crecimiento", icon: "trophy", check: (stats: AchievementStats) => stats.completedSuggestions >= 3 },
+    { type: "weekly_warrior", name: "Guerrero Semanal", icon: "award", check: (stats: AchievementStats) => stats.streak >= 7 },
+];
+
+interface AchievementStats {
+    totalSessions: number;
+    totalMessages: number;
+    analysisCount: number;
+    streak: number;
+    completedSuggestions: number;
+}
+
 export function useAnalysis(userId: string | null) {
     const [emotionData, setEmotionData] = useState<EmotionData | null>(null);
     const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
@@ -70,8 +88,40 @@ export function useAnalysis(userId: string | null) {
         }
     }, [userId]);
 
-    const runFullAnalysis = useCallback(async (messages: Message[], onSuggestionsGenerated: (suggestions: Suggestion[]) => void) => {
-        if (messages.length < 3 || !userId) return;
+    // Check and grant new achievements
+    const checkAchievements = useCallback(async (stats: AchievementStats) => {
+        if (!userId) return;
+
+        const { data: existing } = await supabase
+            .from("user_achievements")
+            .select("achievement_type")
+            .eq("user_id", userId);
+
+        const earnedTypes = new Set((existing || []).map(a => a.achievement_type));
+
+        for (const def of ACHIEVEMENT_DEFINITIONS) {
+            if (!earnedTypes.has(def.type) && def.check(stats)) {
+                await supabase.from("user_achievements").insert({
+                    user_id: userId,
+                    achievement_type: def.type,
+                    achievement_name: def.name,
+                    badge_icon: def.icon,
+                    level: 1,
+                    progress_percentage: 100,
+                    earned_at: new Date().toISOString(),
+                });
+            }
+        }
+
+        await fetchAchievements();
+    }, [userId, fetchAchievements]);
+
+    // Run analysis SEQUENTIALLY to avoid timeout
+    const runFullAnalysis = useCallback(async (
+        messages: Message[],
+        onSuggestionsGenerated: (suggestions: Suggestion[]) => void
+    ) => {
+        if (messages.length < 2 || !userId) return;
 
         setIsAnalyzing(true);
         const chatHistory = messages.map((m) => ({
@@ -80,14 +130,10 @@ export function useAnalysis(userId: string | null) {
         }));
 
         try {
-            const [emotionResponse, suggestionsResponse] = await Promise.all([
-                supabase.functions.invoke("therapy-chat", {
-                    body: { messages: chatHistory, type: "analyze_emotions" },
-                }),
-                supabase.functions.invoke("therapy-chat", {
-                    body: { messages: chatHistory, type: "generate_suggestions" },
-                }),
-            ]);
+            // STEP 1: Analyze emotions (sequential, NOT parallel)
+            const emotionResponse = await supabase.functions.invoke("therapy-chat", {
+                body: { messages: chatHistory, type: "analyze_emotions" },
+            });
 
             if (emotionResponse.data?.result) {
                 try {
@@ -123,12 +169,16 @@ export function useAnalysis(userId: string | null) {
                         evolution_notes: parsed.evolution,
                     });
 
-                    fetchHistory();
-
+                    await fetchHistory();
                 } catch (e) {
-                    console.error("Error parsing emotion analysis:", e, "Raw:", emotionResponse.data.result);
+                    console.error("Error parsing emotion analysis:", e);
                 }
             }
+
+            // STEP 2: Generate suggestions (after emotions complete)
+            const suggestionsResponse = await supabase.functions.invoke("therapy-chat", {
+                body: { messages: chatHistory, type: "generate_suggestions" },
+            });
 
             if (suggestionsResponse.data?.result && userId) {
                 try {
@@ -158,15 +208,42 @@ export function useAnalysis(userId: string | null) {
                         }
                     }
                 } catch (e) {
-                    console.error("Error parsing suggestions:", e, "Raw:", suggestionsResponse.data.result);
+                    console.error("Error parsing suggestions:", e);
                 }
             }
+
+            // STEP 3: Check for new achievements
+            const { count: msgCount } = await supabase
+                .from("chat_messages")
+                .select("*", { count: "exact", head: true })
+                .eq("user_id", userId);
+
+            const { count: sugCount } = await supabase
+                .from("daily_suggestions")
+                .select("*", { count: "exact", head: true })
+                .eq("user_id", userId)
+                .eq("confirmed", true);
+
+            const { data: profile } = await supabase
+                .from("profiles")
+                .select("streak_days, total_sessions")
+                .eq("user_id", userId)
+                .single();
+
+            await checkAchievements({
+                totalSessions: profile?.total_sessions || 0,
+                totalMessages: msgCount || 0,
+                analysisCount: historicalAnalysis.length + 1,
+                streak: profile?.streak_days || 0,
+                completedSuggestions: sugCount || 0,
+            });
+
         } catch (error) {
             console.error("Analysis error:", error);
         } finally {
             setIsAnalyzing(false);
         }
-    }, [userId, fetchHistory]);
+    }, [userId, fetchHistory, checkAchievements, historicalAnalysis.length]);
 
     useEffect(() => {
         if (userId) {
