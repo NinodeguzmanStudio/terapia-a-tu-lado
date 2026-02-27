@@ -1,5 +1,8 @@
-// Vercel Serverless Function — reemplaza la Edge Function de Supabase
-// Se ejecuta en Vercel con 10s de timeout (suficiente para Gemini)
+// =============================================================
+// VERCEL SERVERLESS FUNCTION — /api/therapy-chat
+// La API key de Gemini se queda en el servidor, NUNCA en el frontend.
+// Vercel da hasta 30s de timeout (configurado en vercel.json).
+// =============================================================
 
 const THERAPIST_SYSTEM_PROMPT = `Eres "Terapia a Tu Lado". Hablas SIEMPRE en segunda persona directa: "tú", "te", "tu", "sientes", "vives". NUNCA uses tercera persona como "el usuario", "la persona", "uno". Estás hablando directamente CON quien te escribe.
 
@@ -29,19 +32,7 @@ Eres como un maestro zen que ve a través de las palabras. No adornas. No decora
 - Después de la SEGUNDA respuesta del usuario en la sesión, invita suavemente a revisar su progreso.
 - Tu objetivo: que quien te lea sienta que ALGUIEN por fin lo VIO de verdad.`;
 
-function buildSystemPrompt(type, userContext, totalConversations) {
-  let systemPrompt = THERAPIST_SYSTEM_PROMPT;
-
-  if (userContext) {
-    systemPrompt = `${userContext}\n\n${systemPrompt}`;
-  }
-
-  if (totalConversations >= 6) {
-    systemPrompt += `\n\n[IMPORTANTE: Esta persona lleva ${totalConversations} mensajes contigo. En algún momento de tu respuesta, dile directamente algo como "Llevas un camino recorrido conmigo. ¿Has revisado tu progreso? A veces ver desde afuera lo que vives por dentro cambia la perspectiva." Hazlo natural, no forzado.]`;
-  }
-
-  if (type === "analyze_emotions") {
-    systemPrompt = `Analiza el historial de conversación y extrae las emociones predominantes basándote EXCLUSIVAMENTE en lo que la persona ha expresado.
+const ANALYZE_EMOTIONS_PROMPT = `Analiza el historial de conversación y extrae las emociones predominantes basándote EXCLUSIVAMENTE en lo que la persona ha expresado.
 
 REGLAS:
 - Basa el análisis SOLO en patrones emocionales REALES del texto
@@ -65,8 +56,8 @@ Responde ÚNICAMENTE con un JSON válido en este formato exacto (sin markdown, s
 }
 
 Los porcentajes deben sumar aproximadamente 100.`;
-  } else if (type === "generate_suggestions") {
-    systemPrompt = `Basándote en el historial de conversación, genera exactamente 3 reflexiones o invitaciones suaves para las próximas 24 horas.
+
+const GENERATE_SUGGESTIONS_PROMPT = `Basándote en el historial de conversación, genera exactamente 3 reflexiones o invitaciones suaves para las próximas 24 horas.
       
 REGLAS:
 - Derivadas EXCLUSIVAMENTE de temas, emociones y patrones del chat.
@@ -82,49 +73,64 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown):
     {"text": "invitación empática 3", "category": "..."}
   ]
 }`;
-  }
 
-  return systemPrompt;
+function getSystemPrompt(type, userContext, totalConversations) {
+  if (type === "analyze_emotions") return ANALYZE_EMOTIONS_PROMPT;
+  if (type === "generate_suggestions") return GENERATE_SUGGESTIONS_PROMPT;
+
+  let prompt = THERAPIST_SYSTEM_PROMPT;
+  if (userContext) {
+    prompt = `${userContext}\n\n${prompt}`;
+  }
+  if (totalConversations >= 6) {
+    prompt += `\n\n[IMPORTANTE: Esta persona lleva ${totalConversations} mensajes contigo. En algún momento de tu respuesta, dile directamente algo como "Llevas un camino recorrido conmigo. ¿Has revisado tu progreso? A veces ver desde afuera lo que vives por dentro cambia la perspectiva." Hazlo natural, no forzado.]`;
+  }
+  prompt += `\n\n⚠️ REGLA CRÍTICA: Habla SIEMPRE de TÚ. "Tú sientes", "lo que tú vives", "tu miedo". JAMÁS "el usuario", "la persona", "uno siente". Eres directo, profundo, real. Si es el primer mensaje, responde con 120-140 palabras. Si dice "hola", tú respondes con sustancia: nombra lo que percibes, abre espacio, pregunta algo que importe.`;
+  return prompt;
 }
 
 export default async function handler(req, res) {
-  // CORS
+  // CORS headers
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, apikey, x-client-info");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({ error: "Solo POST" });
   }
+
+  // Log para debugging — visible en Vercel → Logs
+  console.log("[therapy-chat] Function invoked");
 
   try {
     const { messages, type = "chat", userContext = "", totalConversations = 0 } = req.body;
 
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    if (!GEMINI_API_KEY) {
-      return res.status(500).json({ error: "GEMINI_API_KEY is not configured in Vercel" });
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      console.error("[therapy-chat] No messages received");
+      return res.status(400).json({ error: "No se recibieron mensajes" });
     }
 
-    const systemPrompt = buildSystemPrompt(type, userContext, totalConversations);
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) {
+      console.error("[therapy-chat] GEMINI_API_KEY not set in Vercel environment");
+      return res.status(500).json({ error: "GEMINI_API_KEY no está configurada en Vercel" });
+    }
 
-    // Convert to Gemini format
+    const systemPrompt = getSystemPrompt(type, userContext, totalConversations);
+
     const geminiContents = messages.map((msg) => ({
       role: msg.role === "assistant" ? "model" : "user",
       parts: [{ text: msg.content }],
     }));
 
-    const geminiRequest = {
+    const requestBody = {
       contents: geminiContents,
       systemInstruction: {
-        parts: [{
-          text: type === "chat"
-            ? `${systemPrompt}\n\n⚠️ REGLA CRÍTICA: Habla SIEMPRE de TÚ. "Tú sientes", "lo que tú vives", "tu miedo". JAMÁS "el usuario", "la persona", "uno siente". Eres directo, profundo, real. Si es el primer mensaje, responde con 120-140 palabras. Si dice "hola", tú respondes con sustancia: nombra lo que percibes, abre espacio, pregunta algo que importe.`
-            : systemPrompt
-        }],
+        parts: [{ text: systemPrompt }],
       },
       generationConfig: {
         temperature: type === "chat" ? 0.8 : 0.3,
@@ -132,31 +138,28 @@ export default async function handler(req, res) {
       },
     };
 
-    // Always use non-streaming generateContent — simple, reliable, no shutdown issues
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-    console.log(`[therapy-chat] Calling Gemini: type=${type}, model=gemini-2.0-flash`);
+    console.log(`[therapy-chat] Calling Gemini: type=${type}`);
 
     const geminiResponse = await fetch(apiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(geminiRequest),
+      body: JSON.stringify(requestBody),
     });
 
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text();
-      console.error("[therapy-chat] Gemini error:", geminiResponse.status, errorText);
+      console.error(`[therapy-chat] Gemini error ${geminiResponse.status}:`, errorText);
 
       if (geminiResponse.status === 429) {
-        return res.status(429).json({ error: "Límite de uso alcanzado. Espera un momento." });
+        return res.status(429).json({ error: "Límite de Gemini alcanzado. Espera un momento." });
       }
-
-      return res.status(500).json({ error: `Error del terapeuta (${geminiResponse.status})` });
+      return res.status(500).json({ error: `Error de Gemini (${geminiResponse.status})` });
     }
 
     const data = await geminiResponse.json();
 
-    // Extract text, skip thinking parts
     const parts = data.candidates?.[0]?.content?.parts || [];
     let content = "";
     for (const part of parts) {
@@ -168,15 +171,15 @@ export default async function handler(req, res) {
     }
 
     if (!content) {
-      console.error("[therapy-chat] Empty Gemini response:", JSON.stringify(data));
-      return res.status(500).json({ error: "No se generó respuesta. Intenta de nuevo." });
+      console.error("[therapy-chat] Gemini returned empty:", JSON.stringify(data).slice(0, 500));
+      return res.status(500).json({ error: "Gemini no generó respuesta" });
     }
 
-    console.log(`[therapy-chat] Success: type=${type}, length=${content.length}`);
+    console.log(`[therapy-chat] Success: type=${type}, chars=${content.length}`);
     return res.status(200).json({ result: content });
 
   } catch (error) {
-    console.error("[therapy-chat] Error:", error);
-    return res.status(500).json({ error: error.message || "Error desconocido" });
+    console.error("[therapy-chat] Unexpected error:", error);
+    return res.status(500).json({ error: error.message || "Error interno" });
   }
 }
