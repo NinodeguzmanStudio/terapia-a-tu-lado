@@ -19,7 +19,6 @@ export function useAnalysis(userId: string | null) {
     const [historicalAnalysis, setHistoricalAnalysis] = useState<HistoricalEmotion[]>([]);
     const [achievements, setAchievements] = useState<Achievement[]>([]);
 
-    // Fetch historical emotion analysis
     const fetchHistory = useCallback(async () => {
         if (!userId) return;
         const { data, error } = await supabase
@@ -32,7 +31,6 @@ export function useAnalysis(userId: string | null) {
         if (!error && data) {
             setHistoricalAnalysis(data);
 
-            // Also populate current emotion/analysis data from the latest entry
             if (data.length > 0) {
                 const latest = data[data.length - 1];
                 setEmotionData({
@@ -51,7 +49,6 @@ export function useAnalysis(userId: string | null) {
         }
     }, [userId]);
 
-    // Fetch achievements from user_achievements table
     const fetchAchievements = useCallback(async () => {
         if (!userId) return;
         const { data, error } = await supabase
@@ -95,7 +92,6 @@ export function useAnalysis(userId: string | null) {
             if (emotionResponse.data?.result) {
                 try {
                     let rawResult = emotionResponse.data.result;
-                    // Clean markdown fences if present
                     rawResult = rawResult.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
                     const parsed = JSON.parse(rawResult);
                     const newEmotionData: EmotionData = {
@@ -114,7 +110,6 @@ export function useAnalysis(userId: string | null) {
                         evolution: parsed.evolution || "",
                     });
 
-                    // Save to database for trends
                     await supabase.from("emotional_analysis").insert({
                         user_id: userId,
                         analysis_date: new Date().toISOString().split('T')[0],
@@ -128,7 +123,6 @@ export function useAnalysis(userId: string | null) {
                         evolution_notes: parsed.evolution,
                     });
 
-                    // Refresh history after new analysis
                     fetchHistory();
 
                 } catch (e) {
@@ -152,7 +146,6 @@ export function useAnalysis(userId: string | null) {
 
                         onSuggestionsGenerated(newSuggestions);
 
-                        // Save to database
                         for (const s of newSuggestions) {
                             await supabase.from("daily_suggestions").insert({
                                 id: s.id,
@@ -175,7 +168,6 @@ export function useAnalysis(userId: string | null) {
         }
     }, [userId, fetchHistory]);
 
-    // Initial load of history + achievements
     useEffect(() => {
         if (userId) {
             fetchHistory();
@@ -183,7 +175,6 @@ export function useAnalysis(userId: string | null) {
         }
     }, [userId, fetchHistory, fetchAchievements]);
 
-    // Full reset — clears ALL local state (DB deletion happens in useChat.fullReset)
     const resetAnalysis = useCallback(() => {
         setEmotionData(null);
         setAnalysisData(null);
