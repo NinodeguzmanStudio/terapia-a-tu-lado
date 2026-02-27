@@ -60,9 +60,17 @@ export function TherapyApp() {
     }
   }, [userId, loadChatHistory, loadSuggestions]);
 
+  // Helper: count how many assistant messages have real content
+  const assistantMessageCount = messages.filter(
+    (m) => m.role === "assistant" && m.content.trim().length > 0
+  ).length;
+
   useEffect(() => {
     if (isStreaming || isLoading) return;
     if (messages.length < 3) return;
+
+    // Only trigger analysis if there are real assistant responses
+    if (assistantMessageCount < 1) return;
 
     if (shouldTriggerAnalysis()) {
       runFullAnalysis(messages, (newSuggestions) => {
@@ -77,15 +85,16 @@ export function TherapyApp() {
         });
       });
     }
-  }, [userMessageCount, isStreaming, isLoading, messages, shouldTriggerAnalysis, runFullAnalysis, setSuggestions]);
+  }, [userMessageCount, isStreaming, isLoading, messages, assistantMessageCount, shouldTriggerAnalysis, runFullAnalysis, setSuggestions]);
 
   useEffect(() => {
-    if (userMessageCount === 2 && !isStreaming && !isLoading) {
+    // Only show "preparing evaluation" toast if there has been at least 1 real assistant response
+    if (userMessageCount === 2 && !isStreaming && !isLoading && assistantMessageCount >= 1) {
       toast.info("Estamos preparando tu evaluación", {
         description: "Sigue conversando. En tu próximo mensaje analizaremos tus patrones emocionales.",
       });
     }
-  }, [userMessageCount, isStreaming, isLoading]);
+  }, [userMessageCount, isStreaming, isLoading, assistantMessageCount]);
 
   const handleResetChat = async () => {
     if (!userId || !userProfile?.is_moderator) return;
@@ -169,5 +178,5 @@ export function TherapyApp() {
         )}
       </main>
     </div>
-  ); 
+  );
 }
