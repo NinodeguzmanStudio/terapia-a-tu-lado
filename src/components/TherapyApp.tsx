@@ -60,11 +60,9 @@ export function TherapyApp() {
     }
   }, [userId, loadChatHistory, loadSuggestions]);
 
-  // FIX: Ref para el timer de análisis
   const analysisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Trigger analysis after streaming completes
-  // FIX: Delay de 8 segundos para no saturar Gemini API
+  // Trigger analysis 5s after chat response to avoid rate limiting Gemini
   useEffect(() => {
     if (isStreaming || isLoading) return;
     if (messages.length < 3) return;
@@ -79,7 +77,6 @@ export function TherapyApp() {
         clearTimeout(analysisTimerRef.current);
       }
 
-      // Esperar 8 segundos antes de analizar para no competir con el chat
       analysisTimerRef.current = setTimeout(() => {
         runFullAnalysis(messages, (newSuggestions) => {
           setSuggestions(newSuggestions);
@@ -93,7 +90,7 @@ export function TherapyApp() {
             duration: 6000,
           });
         });
-      }, 8000);
+      }, 5000);
     }
 
     return () => {
@@ -115,7 +112,6 @@ export function TherapyApp() {
 
   const confirmedSuggestions = suggestions.filter(s => s.confirmed).length;
 
-  // Streak milestones
   useEffect(() => {
     if (userProfile?.streak_days) {
       if (userProfile.streak_days === 7) {
