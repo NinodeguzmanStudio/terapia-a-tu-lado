@@ -48,6 +48,19 @@ export function ChatSection({
 
     const isLimitReached = !isModerator && conversationsToday >= 3;
 
+    // Count real assistant responses (with actual content)
+    const realAssistantResponses = messages.filter(
+        (m) => m.role === "assistant" && m.content.trim().length > 0
+    ).length;
+
+    // Only show progress banner if there have been real back-and-forth conversations
+    const showProgressBanner =
+        totalConversations >= 6 &&
+        realAssistantResponses >= 1 &&
+        messages.length > 0 &&
+        messages[messages.length - 1]?.role === "assistant" &&
+        messages[messages.length - 1]?.content.trim().length > 0;
+
     return (
         <div className="flex-1 flex flex-col min-h-0">
             <header className="px-4 lg:px-8 py-4 border-b border-border bg-card/80 backdrop-blur-sm relative z-20">
@@ -108,7 +121,7 @@ export function ChatSection({
                                     />
                                 ))}
 
-                                {totalConversations >= 6 && messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && (
+                                {showProgressBanner && (
                                     <motion.div
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
