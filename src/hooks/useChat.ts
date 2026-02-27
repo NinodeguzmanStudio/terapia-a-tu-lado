@@ -13,6 +13,8 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
     const [isLoadingHistory, setIsLoadingHistory] = useState(true);
 
     const lastAnalyzedCountRef = useRef(0);
+    // FIX: AbortController ref para cancelar requests colgados
+    const abortControllerRef = useRef<AbortController | null>(null);
     const { toast } = useToast();
 
     const isModerator = userProfile?.is_moderator ?? false;
@@ -111,11 +113,21 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
         const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
+        // FIX BUG #1: AbortController con timeout de 30 segundos
+        // Si la respuesta tarda más de 30s, se cancela automáticamente
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
         try {
             const response = await fetch(
                 `${supabaseUrl}/functions/v1/therapy-chat`,
                 {
                     method: "POST",
+                    signal: controller.signal, // FIX: señal de cancelación
                     headers: {
                         "Content-Type": "application/json",
                         "Authorization": `Bearer ${token}`,
@@ -145,6 +157,8 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             let assistantContent = "";
             const decoder = new TextDecoder();
             let buffer = "";
+            // FIX BUG #4: variable para romper el loop externo cuando llega [DONE]
+            let streamDone = false;
 
             const assistantMessage: Message = {
                 id: crypto.randomUUID(),
@@ -153,9 +167,27 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             };
             setMessages((prev) => [...prev, assistantMessage]);
 
+            // FIX: Timeout por inactividad del stream (si no llegan datos en 15s, abortar)
+            let streamTimeoutId: ReturnType<typeof setTimeout> | null = null;
+            const resetStreamTimeout = () => {
+                if (streamTimeoutId) clearTimeout(streamTimeoutId);
+                streamTimeoutId = setTimeout(() => {
+                    console.warn("Stream inactivo por 15s, cerrando...");
+                    controller.abort();
+                }, 15000);
+            };
+
+            resetStreamTimeout();
+
             while (true) {
+                // FIX BUG #4: salir si ya se recibió [DONE]
+                if (streamDone) break;
+
                 const { done, value } = await reader.read();
                 if (done) break;
+
+                // FIX: resetear timeout de inactividad cada vez que llegan datos
+                resetStreamTimeout();
 
                 buffer += decoder.decode(value, { stream: true });
                 let newlineIndex: number;
@@ -168,7 +200,12 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
                     if (!line.startsWith("data: ")) continue;
 
                     const jsonStr = line.slice(6).trim();
-                    if (jsonStr === "[DONE]") break;
+                    if (jsonStr === "[DONE]") {
+                        // FIX BUG #4: marcar stream como terminado y limpiar buffer
+                        streamDone = true;
+                        buffer = "";
+                        break;
+                    }
 
                     try {
                         const parsed = JSON.parse(jsonStr);
@@ -184,11 +221,16 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
                             );
                         }
                     } catch {
-                        buffer = line + "\n" + buffer;
+                        // FIX BUG #3: guardar solo el JSON sin "data: " para evitar
+                        // re-procesamiento infinito del prefijo
+                        buffer = jsonStr + "\n" + buffer;
                         break;
                     }
                 }
             }
+
+            // Limpiar timeout de inactividad
+            if (streamTimeoutId) clearTimeout(streamTimeoutId);
 
             await saveMessage({ ...assistantMessage, content: assistantContent });
             setIsStreaming(false);
@@ -204,15 +246,29 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             }
 
         } catch (error) {
-            console.error("Chat error:", error);
+            // FIX BUG #1: manejo específico de AbortError (timeout)
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                console.warn("Chat request abortado (timeout o cancelación manual)");
+                toast({
+                    title: "Tiempo de espera agotado",
+                    description: "El terapeuta tardó en responder. Intenta enviar tu mensaje de nuevo.",
+                    variant: "destructive",
+                });
+            } else {
+                console.error("Chat error:", error);
+                toast({
+                    title: "Error de conexión",
+                    description: error instanceof Error ? error.message : "No se pudo enviar el mensaje",
+                    variant: "destructive",
+                });
+            }
             setUserMessageCount((prev) => Math.max(prev - 1, 0));
+        } finally {
+            // FIX BUG #1: SIEMPRE limpiar estados, sin importar si hubo error
+            clearTimeout(timeoutId);
             setIsLoading(false);
             setIsStreaming(false);
-            toast({
-                title: "Error de conexión",
-                description: error instanceof Error ? error.message : "No se pudo enviar el mensaje",
-                variant: "destructive",
-            });
+            abortControllerRef.current = null;
         }
     }, [messages, conversationsToday, userMessageCount, toast, userId, userProfile, totalConversations, saveMessage, isModerator]);
 
