@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Clock, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
@@ -73,7 +72,6 @@ export function DailySuggestions({ suggestions, onToggle, onAddNote, isLoading }
         </span>
       </div>
 
-      {/* Progress bar */}
       <div className="progress-track mb-6">
         <motion.div
           className="progress-fill bg-gradient-warm"
