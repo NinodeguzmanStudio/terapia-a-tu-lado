@@ -12,7 +12,7 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
     const [totalConversations, setTotalConversations] = useState(0);
     const [isLoadingHistory, setIsLoadingHistory] = useState(true);
 
-    const lastAnalyzedThresholdRef = useRef(0);
+    const lastAnalyzedCountRef = useRef(0);
     const { toast } = useToast();
 
     const isModerator = userProfile?.is_moderator ?? false;
@@ -48,11 +48,19 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             })));
 
             const userMsgCount = chatMessages.filter(m => m.role === "user").length;
-            setUserMessageCount(userMsgCount);
-            setConversationsToday(Math.min(Math.floor(userMsgCount / 3), 3));
+            const assistantMsgCount = chatMessages.filter(
+                m => m.role === "assistant" && m.content.trim().length > 0
+            ).length;
 
-            if (userMsgCount >= 3) {
-                lastAnalyzedThresholdRef.current = Math.floor(userMsgCount / 3) * 3;
+            setUserMessageCount(userMsgCount);
+
+            // Count conversations as complete exchanges (user + assistant)
+            const exchanges = Math.min(userMsgCount, assistantMsgCount);
+            setConversationsToday(Math.min(Math.floor(exchanges / 3), 3));
+
+            // Track last analyzed threshold
+            if (userMsgCount >= 2) {
+                lastAnalyzedCountRef.current = Math.floor(userMsgCount / 2) * 2;
             }
         }
 
@@ -88,7 +96,9 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
         await saveMessage(userMessage);
         setIsLoading(true);
 
-        const chatHistory = [...messages, userMessage].map((m) => ({
+        // Only send last 10 messages to avoid timeouts
+        const recentMessages = [...messages, userMessage].slice(-10);
+        const chatHistory = recentMessages.map((m) => ({
             role: m.role,
             content: m.content,
         }));
@@ -185,7 +195,12 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             setTotalConversations((prev) => prev + 1);
 
             if (!isModerator) {
-                setConversationsToday(Math.min(Math.floor(newUserMsgCount / 3), 3));
+                // Count real exchanges for conversation limit
+                const allMessages = [...messages, userMessage, { ...assistantMessage, content: assistantContent }];
+                const uCount = allMessages.filter(m => m.role === "user").length;
+                const aCount = allMessages.filter(m => m.role === "assistant" && m.content.trim().length > 0).length;
+                const exchanges = Math.min(uCount, aCount);
+                setConversationsToday(Math.min(Math.floor(exchanges / 3), 3));
             }
 
         } catch (error) {
@@ -201,15 +216,23 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
         }
     }, [messages, conversationsToday, userMessageCount, toast, userId, userProfile, totalConversations, saveMessage, isModerator]);
 
+    // Trigger analysis after every 2 user messages (2 complete exchanges)
     const shouldTriggerAnalysis = useCallback((): boolean => {
-        if (userMessageCount < 3) return false;
-        const currentThreshold = Math.floor(userMessageCount / 3) * 3;
-        if (currentThreshold > lastAnalyzedThresholdRef.current) {
-            lastAnalyzedThresholdRef.current = currentThreshold;
+        if (userMessageCount < 2) return false;
+
+        // Check there are real assistant responses
+        const assistantResponses = messages.filter(
+            m => m.role === "assistant" && m.content.trim().length > 0
+        ).length;
+        if (assistantResponses < 1) return false;
+
+        const currentThreshold = Math.floor(userMessageCount / 2) * 2;
+        if (currentThreshold > lastAnalyzedCountRef.current) {
+            lastAnalyzedCountRef.current = currentThreshold;
             return true;
         }
         return false;
-    }, [userMessageCount]);
+    }, [userMessageCount, messages]);
 
     const resetChat = useCallback(async () => {
         if (!userId) return;
@@ -222,7 +245,7 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
         setMessages([]);
         setUserMessageCount(0);
         setConversationsToday(0);
-        lastAnalyzedThresholdRef.current = 0;
+        lastAnalyzedCountRef.current = 0;
     }, [userId]);
 
     const fullReset = useCallback(async () => {
@@ -237,7 +260,7 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
         setUserMessageCount(0);
         setConversationsToday(0);
         setTotalConversations(0);
-        lastAnalyzedThresholdRef.current = 0;
+        lastAnalyzedCountRef.current = 0;
     }, [userId]);
 
     return {
