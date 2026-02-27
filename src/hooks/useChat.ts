@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Message, UserProfile } from "@/types/therapy";
 import { useToast } from "@/hooks/use-toast";
+import { callGemini } from "@/lib/gemini";
 
 export function useChat(userId: string | null, userProfile: UserProfile | null) {
     const [messages, setMessages] = useState<Message[]>([]);
@@ -82,7 +83,6 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             return;
         }
 
-        // Clean up any previous typing animation
         if (typingIntervalRef.current) {
             clearInterval(typingIntervalRef.current);
             typingIntervalRef.current = null;
@@ -102,7 +102,7 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
 
         const recentMessages = [...messages, userMessage].slice(-10);
         const chatHistory = recentMessages.map((m) => ({
-            role: m.role,
+            role: m.role as "user" | "assistant",
             content: m.content,
         }));
 
@@ -111,33 +111,14 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             : '';
 
         try {
-            // =======================================================
-            // LLAMADA A VERCEL API (ya no a Supabase Edge Function)
-            // /api/therapy-chat se ejecuta como Vercel Serverless Function
-            // con 10s de timeout — suficiente para que Gemini responda
-            // =======================================================
-            const response = await fetch("/api/therapy-chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    messages: chatHistory,
-                    type: "chat",
-                    userContext,
-                    totalConversations,
-                }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: "Error desconocido" }));
-                throw new Error(errorData.error || `Error ${response.status}`);
-            }
-
-            const data = await response.json();
-            const fullContent = data.result || "";
-
-            if (!fullContent) {
-                throw new Error("El terapeuta no generó respuesta. Intenta de nuevo.");
-            }
+            // Llama a /api/therapy-chat (Vercel serverless)
+            // La API key está segura en el servidor
+            const fullContent = await callGemini(
+                chatHistory,
+                "chat",
+                userContext,
+                totalConversations
+            );
 
             setIsLoading(false);
             setIsStreaming(true);
@@ -149,7 +130,7 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             };
             setMessages((prev) => [...prev, assistantMessage]);
 
-            // Typing animation: muestra la respuesta carácter por carácter
+            // Typing animation
             await new Promise<void>((resolve) => {
                 let charIndex = 0;
                 const charsPerTick = 3;
