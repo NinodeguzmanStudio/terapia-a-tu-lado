@@ -13,6 +13,7 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
     const [isLoadingHistory, setIsLoadingHistory] = useState(true);
 
     const lastAnalyzedCountRef = useRef(0);
+    const typingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const { toast } = useToast();
 
     const isModerator = userProfile?.is_moderator ?? false;
@@ -53,7 +54,6 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             ).length;
 
             setUserMessageCount(userMsgCount);
-
             const exchanges = Math.min(userMsgCount, assistantMsgCount);
             setConversationsToday(Math.min(Math.floor(exchanges / 3), 3));
 
@@ -82,6 +82,12 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             return;
         }
 
+        // Clean up any previous typing animation
+        if (typingIntervalRef.current) {
+            clearInterval(typingIntervalRef.current);
+            typingIntervalRef.current = null;
+        }
+
         const userMessage: Message = {
             id: crypto.randomUUID(),
             role: "user",
@@ -104,97 +110,79 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             ? `[Contexto: El usuario se llama ${userProfile.name}${userProfile.age ? `, tiene ${userProfile.age} años` : ''}. Total de conversaciones previas: ${totalConversations}]`
             : '';
 
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-
         try {
-            // ============================================================
-            // FIX: Fetch simple con AbortController (45s timeout)
-            // Ya NO hay streaming/reader/SSE/TransformStream.
-            // El Edge Function devuelve JSON → lo leemos → lo mostramos.
-            // ============================================================
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 45000);
-
-            const response = await fetch(
-                `${supabaseUrl}/functions/v1/therapy-chat`,
-                {
-                    method: "POST",
-                    signal: controller.signal,
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${token}`,
-                        "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-                        "x-client-info": "supabase-js-antigravity",
-                    },
-                    body: JSON.stringify({
-                        messages: chatHistory,
-                        type: "chat",
-                        userContext,
-                        totalConversations,
-                    }),
-                }
-            );
-
-            clearTimeout(timeoutId);
+            // =======================================================
+            // LLAMADA A VERCEL API (ya no a Supabase Edge Function)
+            // /api/therapy-chat se ejecuta como Vercel Serverless Function
+            // con 10s de timeout — suficiente para que Gemini responda
+            // =======================================================
+            const response = await fetch("/api/therapy-chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    messages: chatHistory,
+                    type: "chat",
+                    userContext,
+                    totalConversations,
+                }),
+            });
 
             if (!response.ok) {
-                let errorMsg = `Error ${response.status}`;
-                try {
-                    const errorData = await response.json();
-                    errorMsg = errorData.error || errorMsg;
-                } catch {
-                    // si no es JSON, usar status
-                }
-                throw new Error(errorMsg);
+                const errorData = await response.json().catch(() => ({ error: "Error desconocido" }));
+                throw new Error(errorData.error || `Error ${response.status}`);
             }
 
-            // Leer respuesta JSON completa (ya no hay stream)
             const data = await response.json();
-            const assistantContent = data.result || "";
+            const fullContent = data.result || "";
 
-            if (!assistantContent) {
-                throw new Error("El terapeuta no pudo generar una respuesta");
+            if (!fullContent) {
+                throw new Error("El terapeuta no generó respuesta. Intenta de nuevo.");
             }
 
-            // Crear mensaje del asistente
+            setIsLoading(false);
+            setIsStreaming(true);
+
             const assistantMessage: Message = {
                 id: crypto.randomUUID(),
                 role: "assistant",
                 content: "",
             };
-
-            // Agregar mensaje vacío y animar efecto de escritura
             setMessages((prev) => [...prev, assistantMessage]);
-            setIsLoading(false);
-            setIsStreaming(true);
 
-            // Efecto de typing: revelar palabra por palabra
-            const words = assistantContent.split(" ");
-            let displayed = "";
+            // Typing animation: muestra la respuesta carácter por carácter
+            await new Promise<void>((resolve) => {
+                let charIndex = 0;
+                const charsPerTick = 3;
+                const intervalMs = 20;
 
-            for (let i = 0; i < words.length; i++) {
-                displayed += (i === 0 ? "" : " ") + words[i];
-                const currentText = displayed;
-                setMessages((prev) =>
-                    prev.map((m) =>
-                        m.id === assistantMessage.id
-                            ? { ...m, content: currentText }
-                            : m
-                    )
-                );
-                await new Promise((r) => setTimeout(r, 30));
-            }
+                typingIntervalRef.current = setInterval(() => {
+                    charIndex = Math.min(charIndex + charsPerTick, fullContent.length);
+                    const partial = fullContent.slice(0, charIndex);
 
+                    setMessages((prev) =>
+                        prev.map((m) =>
+                            m.id === assistantMessage.id
+                                ? { ...m, content: partial }
+                                : m
+                        )
+                    );
+
+                    if (charIndex >= fullContent.length) {
+                        if (typingIntervalRef.current) {
+                            clearInterval(typingIntervalRef.current);
+                            typingIntervalRef.current = null;
+                        }
+                        resolve();
+                    }
+                }, intervalMs);
+            });
+
+            await saveMessage({ ...assistantMessage, content: fullContent });
             setIsStreaming(false);
-
-            // Guardar mensaje completo
-            await saveMessage({ ...assistantMessage, content: assistantContent });
             setTotalConversations((prev) => prev + 1);
 
             if (!isModerator) {
-                const allMessages = [...messages, userMessage, { ...assistantMessage, content: assistantContent }];
+                const allMessages = [...messages, userMessage, { ...assistantMessage, content: fullContent }];
                 const uCount = allMessages.filter(m => m.role === "user").length;
                 const aCount = allMessages.filter(m => m.role === "assistant" && m.content.trim().length > 0).length;
                 const exchanges = Math.min(uCount, aCount);
@@ -204,35 +192,27 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
         } catch (error) {
             console.error("Chat error:", error);
             setUserMessageCount((prev) => Math.max(prev - 1, 0));
-
-            if (error instanceof DOMException && error.name === 'AbortError') {
-                toast({
-                    title: "Tiempo agotado",
-                    description: "La respuesta tardó demasiado. Intenta de nuevo.",
-                    variant: "destructive",
-                });
-            } else {
-                toast({
-                    title: "Error de conexión",
-                    description: error instanceof Error ? error.message : "No se pudo enviar el mensaje",
-                    variant: "destructive",
-                });
-            }
+            toast({
+                title: "Error de conexión",
+                description: error instanceof Error ? error.message : "No se pudo enviar el mensaje",
+                variant: "destructive",
+            });
         } finally {
-            // SIEMPRE limpiar — esto JAMÁS se queda colgado
             setIsLoading(false);
             setIsStreaming(false);
+            if (typingIntervalRef.current) {
+                clearInterval(typingIntervalRef.current);
+                typingIntervalRef.current = null;
+            }
         }
     }, [messages, conversationsToday, userMessageCount, toast, userId, userProfile, totalConversations, saveMessage, isModerator]);
 
     const shouldTriggerAnalysis = useCallback((): boolean => {
         if (userMessageCount < 2) return false;
-
         const assistantResponses = messages.filter(
             m => m.role === "assistant" && m.content.trim().length > 0
         ).length;
         if (assistantResponses < 1) return false;
-
         const currentThreshold = Math.floor(userMessageCount / 2) * 2;
         if (currentThreshold > lastAnalyzedCountRef.current) {
             lastAnalyzedCountRef.current = currentThreshold;
