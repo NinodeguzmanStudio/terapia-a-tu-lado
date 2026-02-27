@@ -67,7 +67,6 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
     }, []);
 
     const sendMessage = useCallback(async (content: string) => {
-        // Moderator bypasses daily limit
         if (!isModerator && conversationsToday >= 3) {
             toast({
                 title: "Límite diario alcanzado",
@@ -226,7 +225,6 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
         lastAnalyzedThresholdRef.current = 0;
     }, [userId]);
 
-    // Full reset — delete ALL user data to start from zero (moderator only)
     const fullReset = useCallback(async () => {
         if (!userId) return;
         await supabase.from("chat_messages").delete().eq("user_id", userId);
