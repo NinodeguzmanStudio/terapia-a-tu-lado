@@ -119,7 +119,6 @@ export function AppSidebar({
                             </button>
                         </nav>
 
-                        {/* Conversation counter - show unlimited for moderator */}
                         <div className="p-4 border-t border-sidebar-border">
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-muted-foreground">Conversaciones hoy</span>
