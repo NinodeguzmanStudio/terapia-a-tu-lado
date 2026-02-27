@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useChat } from "@/hooks/useChat";
@@ -62,7 +62,6 @@ export function TherapyApp() {
 
   const analysisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Trigger analysis 5s after chat response to avoid rate limiting Gemini
   useEffect(() => {
     if (isStreaming || isLoading) return;
     if (messages.length < 3) return;
@@ -73,9 +72,7 @@ export function TherapyApp() {
     if (realAssistantResponses < 1) return;
 
     if (shouldTriggerAnalysis()) {
-      if (analysisTimerRef.current) {
-        clearTimeout(analysisTimerRef.current);
-      }
+      if (analysisTimerRef.current) clearTimeout(analysisTimerRef.current);
 
       analysisTimerRef.current = setTimeout(() => {
         runFullAnalysis(messages, (newSuggestions) => {
@@ -94,9 +91,7 @@ export function TherapyApp() {
     }
 
     return () => {
-      if (analysisTimerRef.current) {
-        clearTimeout(analysisTimerRef.current);
-      }
+      if (analysisTimerRef.current) clearTimeout(analysisTimerRef.current);
     };
   }, [userMessageCount, isStreaming, isLoading, messages, shouldTriggerAnalysis, runFullAnalysis, setSuggestions, refreshProfile]);
 
@@ -115,24 +110,16 @@ export function TherapyApp() {
   useEffect(() => {
     if (userProfile?.streak_days) {
       if (userProfile.streak_days === 7) {
-        toast.success("¡Semana de Constancia!", {
-          description: "Has completado 7 días seguidos cuidando tu bienestar.",
-        });
+        toast.success("¡Semana de Constancia!", { description: "Has completado 7 días seguidos cuidando tu bienestar." });
       } else if (userProfile.streak_days === 14) {
-        toast.success("¡Quincena de Bienestar!", {
-          description: "¡14 días de racha! Tu compromiso es admirable.",
-        });
+        toast.success("¡Quincena de Bienestar!", { description: "¡14 días de racha! Tu compromiso es admirable." });
       } else if (userProfile.streak_days === 30) {
-        toast.success("¡Mes de Transformación!", {
-          description: "¡30 días! Has creado un hábito poderoso de autocuidado.",
-        });
+        toast.success("¡Mes de Transformación!", { description: "¡30 días! Has creado un hábito poderoso de autocuidado." });
       }
     }
   }, [userProfile?.streak_days]);
 
-  const welcomeMessage = userProfile?.name
-    ? `Hola, ${userProfile.name}. `
-    : "";
+  const welcomeMessage = userProfile?.name ? `Hola, ${userProfile.name}. ` : "";
 
   return (
     <div className="min-h-screen bg-gradient-sunset flex">
