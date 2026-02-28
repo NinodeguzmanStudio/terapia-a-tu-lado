@@ -60,11 +60,33 @@ export function TherapyApp() {
     }
   }, [userId, loadChatHistory, loadSuggestions]);
 
+  // ============================================================
+  // ANALYSIS TRIGGER — Fixed version
+  // 
+  // BUG ANTERIOR: El useEffect dependía de `messages`, que cambia
+  // cada 20ms durante la animación de escritura. Cada cambio
+  // ejecutaba el cleanup → borraba el setTimeout → el análisis
+  // NUNCA se disparaba.
+  //
+  // FIX: Usar un ref para proteger el timer. Solo crear el timer
+  // cuando isStreaming pasa de true a false (respuesta terminó).
+  // No depender de `messages` para el trigger.
+  // ============================================================
   const analysisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const analysisScheduledRef = useRef(false);
+  const prevStreamingRef = useRef(false);
 
   useEffect(() => {
-    if (isStreaming || isLoading) return;
+    // Detectar el momento exacto en que isStreaming pasa de true → false
+    // Eso significa: la respuesta del bot TERMINÓ de escribirse
+    const streamingJustEnded = prevStreamingRef.current === true && isStreaming === false;
+    prevStreamingRef.current = isStreaming;
+
+    // Solo actuar cuando el streaming acaba de terminar
+    if (!streamingJustEnded) return;
+    if (isLoading) return;
     if (messages.length < 3) return;
+    if (analysisScheduledRef.current) return; // ya hay un timer pendiente
 
     const realAssistantResponses = messages.filter(
       (m) => m.role === "assistant" && m.content.trim().length > 0
@@ -72,10 +94,12 @@ export function TherapyApp() {
     if (realAssistantResponses < 1) return;
 
     if (shouldTriggerAnalysis()) {
-      if (analysisTimerRef.current) clearTimeout(analysisTimerRef.current);
+      console.log("[TherapyApp] Analysis trigger fired — scheduling in 5s");
+      analysisScheduledRef.current = true;
 
       analysisTimerRef.current = setTimeout(() => {
-        
+        analysisScheduledRef.current = false;
+        console.log("[TherapyApp] Running analysis NOW");
         runFullAnalysis(messages, (newSuggestions) => {
           setSuggestions(newSuggestions);
           refreshProfile();
@@ -91,10 +115,15 @@ export function TherapyApp() {
       }, 5000);
     }
 
+    // NO cleanup del timer aquí — eso era el bug original
+  }, [isStreaming, isLoading, messages, shouldTriggerAnalysis, runFullAnalysis, setSuggestions, refreshProfile]);
+
+  // Cleanup solo al desmontar el componente
+  useEffect(() => {
     return () => {
       if (analysisTimerRef.current) clearTimeout(analysisTimerRef.current);
     };
-  }, [userMessageCount, isStreaming, isLoading, messages, shouldTriggerAnalysis, runFullAnalysis, setSuggestions, refreshProfile]);
+  }, []);
 
   const handleResetChat = async () => {
     if (!userId || !userProfile?.is_moderator) return;
