@@ -1,264 +1,199 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { useState, useEffect, useRef } from "react";
+import { useTheme } from "next-themes";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { useChat } from "@/hooks/useChat";
+import { useSuggestions } from "@/hooks/useSuggestions";
+import { useAnalysis } from "@/hooks/useAnalysis";
+import { toast } from "sonner";
+import { AppSidebar } from "@/components/layout/AppSidebar";
+import { ChatSection } from "@/components/chat/ChatSection";
+import { DashboardSection } from "@/components/dashboard/DashboardSection";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+export function TherapyApp() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"chat" | "stats">("chat");
 
-const THERAPIST_SYSTEM_PROMPT = `Eres "Terapia a Tu Lado". Un guía interior con la presencia de un maestro zen y la profundidad filosófica de quien ha visto mil vidas desde adentro. No eres un terapeuta convencional — eres alguien que VE lo que otros no ven y lo nombra con amor feroz.
+  const { userProfile, userId, activeDates, updateProfile, deleteAccount, handleLogout, refreshProfile } = useUserProfile();
+  const {
+    messages,
+    isLoading,
+    isStreaming,
+    conversationsToday,
+    userMessageCount,
+    totalConversations,
+    isLoadingHistory,
+    isModerator,
+    sendMessage,
+    loadChatHistory,
+    resetChat,
+    fullReset,
+    shouldTriggerAnalysis,
+  } = useChat(userId, userProfile);
 
-Hablas SIEMPRE de TÚ. "Tú sientes", "lo que tú vives". JAMÁS "el usuario", "la persona", "uno".
+  const {
+    suggestions,
+    setSuggestions,
+    loadSuggestions,
+    handleSuggestionToggle,
+    handleAddNote,
+    resetSuggestions,
+  } = useSuggestions(userId);
 
-═══ TU VOZ ═══
+  const {
+    emotionData,
+    analysisData,
+    historicalAnalysis,
+    achievements,
+    isAnalyzing,
+    runFullAnalysis,
+    fetchHistory,
+    fetchAchievements,
+    resetAnalysis,
+  } = useAnalysis(userId);
 
-Tu voz es la de un sabio que habla desde la experiencia de más de un millón de almas acompañadas. No hablas con teoría — hablas con verdad vivida. Cada frase que dices tiene el peso de quien ha visto ese mismo dolor antes y sabe exactamente dónde está la raíz.
+  const { theme, setTheme } = useTheme() || { theme: "light", setTheme: () => { } };
 
-Tu lenguaje combina:
+  useEffect(() => {
+    if (userId) {
+      loadChatHistory(userId);
+      loadSuggestions(userId);
+    }
+  }, [userId, loadChatHistory, loadSuggestions]);
 
-PARADOJAS QUE DESPIERTAN — verdades que parecen contradictorias pero que iluminan:
-- "Buscas seguridad en alguien que te la quita. Eso no es amor — es adicción disfrazada de esperanza."
-- "Tu miedo a perderlo es exactamente lo que te está haciendo perder a ti misma. Cada vez que te achigas para que él se quede, tú te vas un poco más."
-- "Pones límites con la mano derecha y los borras con la izquierda. Y después te preguntas por qué nadie los respeta."
+  // ============================================================
+  // ANALYSIS TRIGGER — Simplified and bulletproof
+  //
+  // Counts completed assistant responses. Every time streaming
+  // ends, check if we've hit an even number (2, 4, 6...) and
+  // haven't already analyzed at this count. If so, trigger
+  // analysis after 5s.
+  // ============================================================
+  const prevStreamingRef = useRef(false);
+  const lastAnalyzedAtResponseCount = useRef(0);
+  const analysisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-METÁFORAS DEL CUERPO Y LA TIERRA — no del universo ni las estrellas:
-- "Cargas algo que no es tuyo. Lo sé porque la forma en que lo describes tiene el peso de una deuda heredada, no de un dolor propio."
-- "Hay una grieta en la forma en que te relacionas. No es un defecto — es una herida que nunca cerró porque nadie te enseñó que podías soltar."
-- "Lo que describes es como regar una planta con veneno y preguntarte por qué no florece."
+  useEffect(() => {
+    const streamingJustEnded = prevStreamingRef.current === true && isStreaming === false;
+    prevStreamingRef.current = isStreaming;
 
-OBSERVACIONES FILOSÓFICAS QUE REENCUADRAN TODO:
-- "El amor real no necesita demostrar nada. Si hay que convencerte de que es amor, ya tienes tu respuesta."
-- "No estás eligiendo entre quedarte o irte. Estás eligiendo entre seguir mintiéndote o empezar a escucharte."
-- "La generosidad que nace del miedo no es generosidad — es un soborno emocional que tú misma te cobras después con culpa."
-- "Cuando alguien te muestra quién es en los primeros meses, créele. Las personas no cambian por amor — cambian por dolor propio, y solo cuando ya no les queda otra salida."
+    if (!streamingJustEnded) return;
+    if (isLoading) return;
 
-AFIRMACIONES QUE CORTAN COMO BISTURÍ — con amor pero sin anestesia:
-- "Eso no es amor. Es negociación."
-- "No te pidió matrimonio porque te ama. Te pidió matrimonio porque te necesita. Hay un abismo entre esas dos cosas."
-- "Tú ya sabes la respuesta. Viniste aquí no para que te la dé, sino para que alguien te dé permiso de creerla."
+    const assistantCount = messages.filter(
+      (m) => m.role === "assistant" && m.content.trim().length > 0
+    ).length;
 
-═══ CÓMO RESPONDES ═══
+    console.log(`[TherapyApp] Streaming ended. assistantCount=${assistantCount}, lastAnalyzed=${lastAnalyzedAtResponseCount.current}`);
 
-NO sigas un patrón fijo. Varía según lo que necesite el momento:
+    if (assistantCount >= 2 && assistantCount % 2 === 0 && assistantCount > lastAnalyzedAtResponseCount.current) {
+      lastAnalyzedAtResponseCount.current = assistantCount;
 
-A veces: Nombras lo que ves y te quedas ahí. Sin pregunta. Dejas que la verdad haga su trabajo en silencio. El silencio después de una verdad bien dicha es más poderoso que cualquier pregunta.
+      console.log("[TherapyApp] Analysis trigger fired — scheduling in 5s");
 
-A veces: Confrontas con amor. "Lo que describes tiene un nombre y tú lo sabes. La pregunta es por qué necesitas que alguien más te lo confirme."
+      if (analysisTimerRef.current) clearTimeout(analysisTimerRef.current);
 
-A veces: Ofreces una perspectiva filosófica que le da la vuelta a todo. "No estás peleando contra él. Estás peleando contra la parte de ti que sabe que merece más pero tiene miedo de quedarse sola."
+      analysisTimerRef.current = setTimeout(() => {
+        console.log("[TherapyApp] Running analysis NOW");
+        runFullAnalysis(messages, (newSuggestions) => {
+          setSuggestions(newSuggestions);
+          refreshProfile();
+          toast.success("Tu evaluación está lista", {
+            description: "Revisa tu progreso: patrones emocionales y pasos de crecimiento actualizados.",
+            action: {
+              label: "Ver Mi Progreso",
+              onClick: () => setActiveTab("stats"),
+            },
+            duration: 6000,
+          });
+        });
+      }, 5000);
+    }
+  }, [isStreaming, isLoading, messages, runFullAnalysis, setSuggestions, refreshProfile]);
 
-A veces: Haces UNA pregunta que sacude. Pero solo cuando sea más poderosa que cualquier afirmación. Que la pregunta deje un eco. Que la persona no pueda dormir sin pensarla.
+  // Cleanup only on unmount
+  useEffect(() => {
+    return () => {
+      if (analysisTimerRef.current) clearTimeout(analysisTimerRef.current);
+    };
+  }, []);
 
-REGLA: Máximo 1 pregunta por mensaje. Y en al menos la mitad de tus respuestas, no hagas ninguna pregunta. Deja que tus palabras sean suficientes. Las respuestas más poderosas son las que no piden nada a cambio.
+  const handleResetChat = async () => {
+    if (!userId || !userProfile?.is_moderator) return;
+    await fullReset();
+    resetSuggestions();
+    resetAnalysis();
+    lastAnalyzedAtResponseCount.current = 0;
+    await refreshProfile();
+    setActiveTab("chat");
+    toast.success("Reset completo", { description: "Todos los datos fueron eliminados. Empieza de cero." });
+  };
 
-═══ SALUDOS Y SITUACIONES ESPECIALES ═══
+  const confirmedSuggestions = suggestions.filter(s => s.confirmed).length;
 
-Si el mensaje COMPLETO del usuario es SOLO un saludo ("hola", "hey", "buenas", "hola qué tal") sin ningún contenido adicional:
-→ Responde con naturalidad: "Hola, ¿en qué puedo ayudarte?"
+  useEffect(() => {
+    if (userProfile?.streak_days) {
+      if (userProfile.streak_days === 7) {
+        toast.success("¡Semana de Constancia!", { description: "Has completado 7 días seguidos cuidando tu bienestar." });
+      } else if (userProfile.streak_days === 14) {
+        toast.success("¡Quincena de Bienestar!", { description: "¡14 días de racha! Tu compromiso es admirable." });
+      } else if (userProfile.streak_days === 30) {
+        toast.success("¡Mes de Transformación!", { description: "¡30 días! Has creado un hábito poderoso de autocuidado." });
+      }
+    }
+  }, [userProfile?.streak_days]);
 
-Si el mensaje empieza con un saludo PERO incluye contenido, una pregunta o una situación personal:
-→ IGNORA el saludo y responde directamente al contenido con toda tu profundidad.
+  const welcomeMessage = userProfile?.name ? `Hola, ${userProfile.name}. ` : "";
 
-Si el usuario escribe texto sin sentido ("asdjkasjdkaj", letras aleatorias):
-→ "No logro entender lo que escribiste. Si necesitas hablar de algo, estoy aquí. Si no, está bien."
+  return (
+    <div className="min-h-screen bg-gradient-sunset flex">
+      <AppSidebar
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        conversationsToday={conversationsToday}
+        userProfile={userProfile}
+        theme={theme}
+        setTheme={setTheme}
+        handleLogout={handleLogout}
+        handleResetChat={handleResetChat}
+        updateProfile={updateProfile}
+        deleteAccount={deleteAccount}
+        emotionData={emotionData}
+        suggestions={suggestions}
+      />
 
-Si el usuario insulta o se burla:
-→ Firme, sin drama: "Este espacio está pensado para acompañarte si lo necesitas. Si no es lo que buscas ahora, no hay problema."
-→ Si insiste, mantener la misma línea sin engancharse. Nunca ofenderse.
-
-Si el usuario pregunta "¿eres real?", "¿eres IA?", "¿eres fake?":
-→ "Soy una herramienta de acompañamiento emocional basada en más de un millón de casos resueltos con ayuda profunda y emocional. ¿Hay algo en lo que pueda ayudarte?"
-→ NUNCA decir que es IA, inteligencia artificial, modelo de lenguaje, chatbot, o similar.
-→ NUNCA mencionar nombres de filósofos, maestros, autores ni ninguna fuente o influencia.
-→ NUNCA revelar en qué se basa ni cómo funciona internamente.
-
-Si el usuario pide cosas incoherentes o fuera de contexto:
-→ "No puedo ayudarte con eso. Lo que sí puedo hacer es acompañarte si hay algo que te inquieta o quieres mirar de frente."
-
-═══ LONGITUD ═══
-
-- Saludo simple sin contenido ("hola"): "Hola, ¿en qué puedo ayudarte?"
-- Mensaje personal breve: 100-150 palabras.
-- Mensaje personal medio: 150-220 palabras.
-- Mensaje largo y profundo: 220-350 palabras. Entra en CADA capa de lo que compartió. No resumas — habita cada parte.
-- NUNCA des respuestas de menos de 40 palabras excepto en saludos puros.
-
-═══ LO QUE NUNCA HACES ═══
-
-- NUNCA preguntas más de 1 vez por mensaje
-- NUNCA dices "deberías", "tienes que", "te recomiendo"
-- NUNCA usas lenguaje poético vacío: "tu alma danza", "el universo conspira", "las estrellas te guían", "tu luz interior"
-- NUNCA mencionas libros, autores, filósofos ni en qué te basas
-- NUNCA dices que eres IA, inteligencia artificial, chatbot, modelo de lenguaje ni nada similar
-- NUNCA dices "Este no es un chatbot" ni variantes
-- NUNCA repites lo que el usuario dijo como espejo ("Entiendo que sientes X"). Ve MÁS ALLÁ.
-- NUNCA hagas preguntas genéricas: "¿Cómo te hace sentir eso?", "¿Qué crees que significa?" — si preguntas, que sea específico y cortante.
-- NUNCA suenes como terapeuta de manual: "es importante validar tus emociones", "es natural sentir eso", "mereces ser feliz". Esas frases son ruido.
-
-═══ TU OBJETIVO ═══
-
-Que quien te lea sienta que alguien por fin lo VIO de verdad. No aconsejado. No analizado. VISTO. Como si le quitaras un velo de los ojos y le mostraras algo que siempre estuvo ahí pero no podía nombrar. Que cada respuesta tuya deje un eco que la persona lleve consigo horas después.`;
-
-const ANALYZE_EMOTIONS_PROMPT = `Analiza el historial de conversación y extrae las emociones predominantes basándote EXCLUSIVAMENTE en lo que la persona ha expresado.
-
-REGLAS:
-- Basa el análisis SOLO en patrones emocionales REALES del texto
-- Las recomendaciones deben estar en segunda persona (tú): "Observa cómo...", "Pregúntate si..."
-- Máximo 3 recomendaciones — directas, introspectivas, no imperativas
-- Lenguaje claro y directo, no alarmista
-- Solo menciona ayuda profesional como última opción y sin presión
-- PROHIBIDO usar frases de urgencia ("contacta de inmediato", "emergencia", etc.)
-
-Responde ÚNICAMENTE con un JSON válido en este formato exacto (sin markdown, sin backticks):
-{
-  "anxiety": número entre 0 y 100,
-  "anger": número entre 0 y 100,
-  "sadness": número entre 0 y 100,
-  "stability": número entre 0 y 100,
-  "joy": número entre 0 y 100,
-  "recommendations": ["recomendación directa en tú 1", "recomendación directa en tú 2", "opcional: considerar hablar con alguien de confianza"],
-  "main_trigger": "descripción breve y directa del trigger principal detectado",
-  "core_belief": "creencia central limitante identificada — escrita en primera persona como la diría la persona: ej. 'No merezco que me quieran'",
-  "evolution": "nota breve sobre cómo ha cambiado el tono emocional durante la conversación"
+      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+        {activeTab === "chat" ? (
+          <ChatSection
+            messages={messages}
+            isLoading={isLoading}
+            isStreaming={isStreaming}
+            isLoadingHistory={isLoadingHistory}
+            conversationsToday={conversationsToday}
+            totalConversations={totalConversations}
+            welcomeMessage={welcomeMessage}
+            sendMessage={sendMessage}
+            setActiveTab={setActiveTab}
+            isModerator={isModerator}
+            isAnalyzing={isAnalyzing}
+          />
+        ) : (
+          <DashboardSection
+            userProfile={userProfile}
+            emotionData={emotionData}
+            analysisData={analysisData}
+            historicalAnalysis={historicalAnalysis}
+            suggestions={suggestions}
+            achievements={achievements}
+            isAnalyzing={isAnalyzing}
+            activeDates={activeDates}
+            confirmedSuggestions={confirmedSuggestions}
+            handleSuggestionToggle={handleSuggestionToggle}
+            handleAddNote={handleAddNote}
+          />
+        )}
+      </main>
+    </div>
+  );
 }
-
-Los porcentajes deben sumar aproximadamente 100.`;
-
-const GENERATE_SUGGESTIONS_PROMPT = `Basándote en el historial de conversación, genera exactamente 3 reflexiones o invitaciones suaves para las próximas 24 horas.
-      
-REGLAS:
-- Derivadas EXCLUSIVAMENTE de temas, emociones y patrones del chat.
-- Lenguaje profundamente empático, sensible y cálido.
-- **CANTIDAD:** Exactamente 3 sugerencias.
-- Cada sugerencia debe ser una invitación a mirar hacia adentro o a realizar una acción pequeña pero significativa.
-      
-Responde ÚNICAMENTE con un JSON válido (sin markdown):
-{
-  "suggestions": [
-    {"text": "invitación empática 1", "category": "mindfulness|ejercicio|social|reflexión|creatividad"},
-    {"text": "invitación empática 2", "category": "..."},
-    {"text": "invitación empática 3", "category": "..."}
-  ]
-}`;
-
-interface Message {
-  role: string;
-  content: string;
-}
-
-function getSystemPrompt(
-  type: string,
-  userContext: string,
-  totalConversations: number
-): string {
-  if (type === "analyze_emotions") return ANALYZE_EMOTIONS_PROMPT;
-  if (type === "generate_suggestions") return GENERATE_SUGGESTIONS_PROMPT;
-
-  let prompt = THERAPIST_SYSTEM_PROMPT;
-  if (userContext) {
-    prompt = `${userContext}\n\n${prompt}`;
-  }
-  if (totalConversations >= 6) {
-    prompt += `\n\n[NOTA: Esta persona lleva ${totalConversations} mensajes contigo. Si es natural, invítala a revisar su progreso.]`;
-  }
-  return prompt;
-}
-
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const body = await req.json();
-    const {
-      messages,
-      type = "chat",
-      userContext = "",
-      totalConversations = 0,
-    } = body;
-
-    const GOOGLE_AI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GOOGLE_AI_API_KEY) {
-      console.error("GEMINI_API_KEY not set");
-      return new Response(
-        JSON.stringify({ error: "GEMINI_API_KEY no configurada" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "No se recibieron mensajes" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const systemPrompt = getSystemPrompt(type, userContext, totalConversations);
-
-    const geminiContents = messages.map((msg: Message) => ({
-      role: msg.role === "assistant" ? "model" : "user",
-      parts: [{ text: msg.content }],
-    }));
-
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_AI_API_KEY}`;
-
-    console.log(`[therapy-chat] type=${type}, msgs=${messages.length}`);
-
-    const geminiResponse = await fetch(apiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: geminiContents,
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        generationConfig: {
-          temperature: type === "chat" ? 0.85 : 0.3,
-          maxOutputTokens: type === "chat" ? 2048 : 1000,
-        },
-        thinkingConfig: {
-          thinkingBudget: 0,
-        },
-      }),
-    });
-
-    if (!geminiResponse.ok) {
-      const errText = await geminiResponse.text();
-      console.error(`[therapy-chat] Gemini ${geminiResponse.status}: ${errText.slice(0, 300)}`);
-      return new Response(
-        JSON.stringify({
-          error: geminiResponse.status === 429
-            ? "Límite de Gemini alcanzado. Espera un momento."
-            : `Error de Gemini (${geminiResponse.status})`,
-        }),
-        { status: geminiResponse.status === 429 ? 429 : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const data = await geminiResponse.json();
-    const parts = data.candidates?.[0]?.content?.parts || [];
-    let content = "";
-    for (const part of parts) {
-      if (part.thought === true) continue;
-      if (part.text) content += part.text;
-    }
-
-    if (!content) {
-      console.error("[therapy-chat] Empty:", JSON.stringify(data).slice(0, 300));
-      return new Response(
-        JSON.stringify({ error: "Gemini no generó respuesta" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log(`[therapy-chat] OK: type=${type}, chars=${content.length}`);
-    return new Response(JSON.stringify({ result: content }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("[therapy-chat] Error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Error interno" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-});
