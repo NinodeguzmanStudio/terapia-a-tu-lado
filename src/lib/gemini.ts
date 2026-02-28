@@ -1,8 +1,4 @@
-// ============================================================
-// Llama a Supabase Edge Function via supabase.functions.invoke.
-// Esto FUNCIONA — es el mismo método que usaba tu app original.
-// La diferencia es que ahora la Edge Function NO usa streaming.
-// ============================================================
+// Llama a Supabase Edge Function via supabase.functions.invoke
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -17,7 +13,7 @@ export async function callGemini(
   userContext: string = "",
   totalConversations: number = 0
 ): Promise<string> {
-  console.log(`[callGemini] type=${type}, messages=${messages.length}`);
+  console.log(`[callGemini] START type=${type}, messages=${messages.length}`);
 
   const { data, error } = await supabase.functions.invoke("therapy-chat", {
     body: {
@@ -28,16 +24,18 @@ export async function callGemini(
     },
   });
 
+  console.log(`[callGemini] Response received. error=${!!error}, data keys=${data ? Object.keys(data) : 'null'}`);
+
   if (error) {
-    console.error("[callGemini] Error:", error);
+    console.error("[callGemini] Error:", error.message, error);
     throw new Error(error.message || "Error al contactar al terapeuta");
   }
 
   if (!data || !data.result) {
-    console.error("[callGemini] No result. Response:", JSON.stringify(data));
+    console.error("[callGemini] No result. data:", JSON.stringify(data));
     throw new Error("El terapeuta no generó respuesta. Intenta de nuevo.");
   }
 
-  console.log(`[callGemini] OK: type=${type}, chars=${data.result.length}`);
+  console.log(`[callGemini] OK type=${type}, chars=${data.result.length}`);
   return data.result;
 }
