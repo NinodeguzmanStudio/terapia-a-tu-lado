@@ -1,7 +1,10 @@
 // ============================================================
-// GEMINI.TS — Llama a /api/therapy-chat (Vercel serverless).
-// La API key se queda en el servidor. NUNCA en el frontend.
+// Llama a Supabase Edge Function via supabase.functions.invoke.
+// Esto FUNCIONA — es el mismo método que usaba tu app original.
+// La diferencia es que ahora la Edge Function NO usa streaming.
 // ============================================================
+
+import { supabase } from "@/integrations/supabase/client";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -14,45 +17,27 @@ export async function callGemini(
   userContext: string = "",
   totalConversations: number = 0
 ): Promise<string> {
+  console.log(`[callGemini] type=${type}, messages=${messages.length}`);
 
-  console.log(`[callGemini] Sending request: type=${type}, messages=${messages.length}`);
-
-  const response = await fetch("/api/therapy-chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  const { data, error } = await supabase.functions.invoke("therapy-chat", {
+    body: {
       messages,
       type,
       userContext,
       totalConversations,
-    }),
+    },
   });
 
-  // Si la respuesta no es JSON, es que Vercel devolvió HTML (la función no existe)
-  const contentType = response.headers.get("content-type") || "";
-  if (!contentType.includes("application/json")) {
-    console.error("[callGemini] Response is not JSON — the serverless function is not running");
-    console.error("[callGemini] Content-Type:", contentType);
-    console.error("[callGemini] Status:", response.status);
-    const text = await response.text();
-    console.error("[callGemini] Body (first 200 chars):", text.slice(0, 200));
-    throw new Error(
-      "La función del servidor no está activa. Verifica que el archivo api/therapy-chat.js exista en la raíz del repo y que vercel.json esté configurado."
-    );
+  if (error) {
+    console.error("[callGemini] Error:", error);
+    throw new Error(error.message || "Error al contactar al terapeuta");
   }
 
-  const data = await response.json();
-
-  if (!response.ok) {
-    console.error("[callGemini] Server error:", data.error);
-    throw new Error(data.error || `Error ${response.status}`);
-  }
-
-  if (!data.result) {
-    console.error("[callGemini] Empty result from server");
+  if (!data || !data.result) {
+    console.error("[callGemini] No result. Response:", JSON.stringify(data));
     throw new Error("El terapeuta no generó respuesta. Intenta de nuevo.");
   }
 
-  console.log(`[callGemini] Success: type=${type}, length=${data.result.length}`);
+  console.log(`[callGemini] OK: type=${type}, chars=${data.result.length}`);
   return data.result;
 }
