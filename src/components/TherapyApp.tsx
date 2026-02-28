@@ -61,44 +61,41 @@ export function TherapyApp() {
   }, [userId, loadChatHistory, loadSuggestions]);
 
   // ============================================================
-  // ANALYSIS TRIGGER — Fixed version
-  // 
-  // BUG ANTERIOR: El useEffect dependía de `messages`, que cambia
-  // cada 20ms durante la animación de escritura. Cada cambio
-  // ejecutaba el cleanup → borraba el setTimeout → el análisis
-  // NUNCA se disparaba.
+  // ANALYSIS TRIGGER — Simplified and bulletproof
   //
-  // FIX: Usar un ref para proteger el timer. Solo crear el timer
-  // cuando isStreaming pasa de true a false (respuesta terminó).
-  // No depender de `messages` para el trigger.
+  // Logic: Count completed assistant responses. Every time a NEW
+  // response finishes (streaming ends), check if we've hit an
+  // even number (2, 4, 6...) and haven't already analyzed at
+  // this count. If so, trigger analysis after 5s.
   // ============================================================
-  const analysisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const analysisScheduledRef = useRef(false);
   const prevStreamingRef = useRef(false);
+  const lastAnalyzedAtResponseCount = useRef(0);
+  const analysisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // Detectar el momento exacto en que isStreaming pasa de true → false
-    // Eso significa: la respuesta del bot TERMINÓ de escribirse
     const streamingJustEnded = prevStreamingRef.current === true && isStreaming === false;
     prevStreamingRef.current = isStreaming;
 
-    // Solo actuar cuando el streaming acaba de terminar
     if (!streamingJustEnded) return;
     if (isLoading) return;
-    if (messages.length < 3) return;
-    if (analysisScheduledRef.current) return; // ya hay un timer pendiente
 
-    const realAssistantResponses = messages.filter(
+    // Count how many complete assistant responses exist RIGHT NOW
+    const assistantCount = messages.filter(
       (m) => m.role === "assistant" && m.content.trim().length > 0
     ).length;
-    if (realAssistantResponses < 1) return;
 
-    if (shouldTriggerAnalysis()) {
+    console.log(`[TherapyApp] Streaming ended. assistantCount=${assistantCount}, lastAnalyzed=${lastAnalyzedAtResponseCount.current}`);
+
+    // Trigger at every 2nd response: 2, 4, 6...
+    // But only if we haven't already triggered at this count
+    if (assistantCount >= 2 && assistantCount % 2 === 0 && assistantCount > lastAnalyzedAtResponseCount.current) {
+      lastAnalyzedAtResponseCount.current = assistantCount;
+
       console.log("[TherapyApp] Analysis trigger fired — scheduling in 5s");
-      analysisScheduledRef.current = true;
+
+      if (analysisTimerRef.current) clearTimeout(analysisTimerRef.current);
 
       analysisTimerRef.current = setTimeout(() => {
-        analysisScheduledRef.current = false;
         console.log("[TherapyApp] Running analysis NOW");
         runFullAnalysis(messages, (newSuggestions) => {
           setSuggestions(newSuggestions);
@@ -114,11 +111,9 @@ export function TherapyApp() {
         });
       }, 5000);
     }
+  }, [isStreaming, isLoading, messages, runFullAnalysis, setSuggestions, refreshProfile]);
 
-    // NO cleanup del timer aquí — eso era el bug original
-  }, [isStreaming, isLoading, messages, shouldTriggerAnalysis, runFullAnalysis, setSuggestions, refreshProfile]);
-
-  // Cleanup solo al desmontar el componente
+  // Cleanup only on unmount
   useEffect(() => {
     return () => {
       if (analysisTimerRef.current) clearTimeout(analysisTimerRef.current);
@@ -130,6 +125,7 @@ export function TherapyApp() {
     await fullReset();
     resetSuggestions();
     resetAnalysis();
+    lastAnalyzedAtResponseCount.current = 0;
     await refreshProfile();
     setActiveTab("chat");
     toast.success("Reset completo", { description: "Todos los datos fueron eliminados. Empieza de cero." });
