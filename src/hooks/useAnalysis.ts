@@ -30,6 +30,11 @@ interface AchievementStats {
     completedSuggestions: number;
 }
 
+// Helper: wait N milliseconds
+function wait(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export function useAnalysis(userId: string | null) {
     const [emotionData, setEmotionData] = useState<EmotionData | null>(null);
     const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
@@ -120,14 +125,19 @@ export function useAnalysis(userId: string | null) {
     ) => {
         if (messages.length < 2 || !userId) return;
 
+        console.log("[Analysis] Starting full analysis...");
         setIsAnalyzing(true);
-        const chatHistory = messages.map((m) => ({
+
+        // Only send last 8 messages to keep it fast
+        const recentMessages = messages.slice(-8);
+        const chatHistory = recentMessages.map((m) => ({
             role: m.role as "user" | "assistant",
             content: m.content,
         }));
 
         try {
-            // STEP 1: Analyze emotions via Vercel serverless
+            // STEP 1: Analyze emotions
+            console.log("[Analysis] Step 1: emotions...");
             try {
                 const emotionResult = await callGemini(chatHistory, "analyze_emotions");
                 const cleaned = emotionResult.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
@@ -163,11 +173,19 @@ export function useAnalysis(userId: string | null) {
                 });
 
                 await fetchHistory();
+                console.log("[Analysis] Step 1 OK");
             } catch (e) {
-                console.error("Error in emotion analysis:", e);
+                console.error("[Analysis] Step 1 FAILED:", e);
             }
 
-            // STEP 2: Generate suggestions via Vercel serverless
+            // ============================================================
+            // WAIT 3 SECONDS between calls to avoid Gemini rate limiting
+            // ============================================================
+            console.log("[Analysis] Waiting 3s before step 2...");
+            await wait(3000);
+
+            // STEP 2: Generate suggestions
+            console.log("[Analysis] Step 2: suggestions...");
             try {
                 const sugResult = await callGemini(chatHistory, "generate_suggestions");
                 const cleaned = sugResult.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
@@ -195,38 +213,46 @@ export function useAnalysis(userId: string | null) {
                         });
                     }
                 }
+                console.log("[Analysis] Step 2 OK");
             } catch (e) {
-                console.error("Error in suggestions:", e);
+                console.error("[Analysis] Step 2 FAILED:", e);
             }
 
             // STEP 3: Check achievements
-            const { count: msgCount } = await supabase
-                .from("chat_messages")
-                .select("*", { count: "exact", head: true })
-                .eq("user_id", userId);
+            console.log("[Analysis] Step 3: achievements...");
+            try {
+                const { count: msgCount } = await supabase
+                    .from("chat_messages")
+                    .select("*", { count: "exact", head: true })
+                    .eq("user_id", userId);
 
-            const { count: sugCount } = await supabase
-                .from("daily_suggestions")
-                .select("*", { count: "exact", head: true })
-                .eq("user_id", userId)
-                .eq("confirmed", true);
+                const { count: sugCount } = await supabase
+                    .from("daily_suggestions")
+                    .select("*", { count: "exact", head: true })
+                    .eq("user_id", userId)
+                    .eq("confirmed", true);
 
-            const { data: profile } = await supabase
-                .from("profiles")
-                .select("streak_days, total_sessions")
-                .eq("user_id", userId)
-                .single();
+                const { data: profile } = await supabase
+                    .from("profiles")
+                    .select("streak_days, total_sessions")
+                    .eq("user_id", userId)
+                    .single();
 
-            await checkAchievements({
-                totalSessions: profile?.total_sessions || 0,
-                totalMessages: msgCount || 0,
-                analysisCount: historicalAnalysis.length + 1,
-                streak: profile?.streak_days || 0,
-                completedSuggestions: sugCount || 0,
-            });
+                await checkAchievements({
+                    totalSessions: profile?.total_sessions || 0,
+                    totalMessages: msgCount || 0,
+                    analysisCount: historicalAnalysis.length + 1,
+                    streak: profile?.streak_days || 0,
+                    completedSuggestions: sugCount || 0,
+                });
+                console.log("[Analysis] Step 3 OK");
+            } catch (e) {
+                console.error("[Analysis] Step 3 FAILED:", e);
+            }
 
+            console.log("[Analysis] COMPLETE");
         } catch (error) {
-            console.error("Analysis error:", error);
+            console.error("[Analysis] Fatal error:", error);
         } finally {
             setIsAnalyzing(false);
         }
