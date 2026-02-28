@@ -75,8 +75,7 @@ export function TherapyApp() {
       if (analysisTimerRef.current) clearTimeout(analysisTimerRef.current);
 
       analysisTimerRef.current = setTimeout(() => {
-        console.log("[Analysis] DESACTIVADO temporalmente");
-        return; // DESACTIVAR ANÁLISIS TEMPORALMENTE
+        
         runFullAnalysis(messages, (newSuggestions) => {
           setSuggestions(newSuggestions);
           refreshProfile();
