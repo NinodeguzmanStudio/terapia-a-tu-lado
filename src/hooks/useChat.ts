@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Message, UserProfile } from "@/types/therapy";
 import { useToast } from "@/hooks/use-toast";
@@ -15,20 +15,55 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
 
     const lastAnalyzedCountRef = useRef(0);
     const typingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const safetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isBusyRef = useRef(false); // track if sendMessage is running
     const { toast } = useToast();
 
     const isModerator = userProfile?.is_moderator ?? false;
 
+    // ============================================================
+    // SAFETY NET: si isLoading o isStreaming quedan true por más de
+    // 60 segundos, forzar reset. Esto evita que el chat se bloquee.
+    // ============================================================
+    useEffect(() => {
+        if (isLoading || isStreaming) {
+            safetyTimeoutRef.current = setTimeout(() => {
+                console.warn("[useChat] SAFETY TIMEOUT — forcing reset after 60s");
+                setIsLoading(false);
+                setIsStreaming(false);
+                isBusyRef.current = false;
+                if (typingIntervalRef.current) {
+                    clearInterval(typingIntervalRef.current);
+                    typingIntervalRef.current = null;
+                }
+            }, 60000);
+        } else {
+            if (safetyTimeoutRef.current) {
+                clearTimeout(safetyTimeoutRef.current);
+                safetyTimeoutRef.current = null;
+            }
+        }
+        return () => {
+            if (safetyTimeoutRef.current) {
+                clearTimeout(safetyTimeoutRef.current);
+            }
+        };
+    }, [isLoading, isStreaming]);
+
     const saveMessage = useCallback(async (message: Message) => {
         if (!userId) return;
-        const today = new Date().toISOString().split('T')[0];
-        await supabase.from("chat_messages").insert({
-            id: message.id,
-            user_id: userId,
-            content: message.content,
-            role: message.role,
-            session_date: today
-        });
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            await supabase.from("chat_messages").insert({
+                id: message.id,
+                user_id: userId,
+                content: message.content,
+                role: message.role,
+                session_date: today
+            });
+        } catch (e) {
+            console.error("[useChat] saveMessage error (non-blocking):", e);
+        }
     }, [userId]);
 
     const loadChatHistory = useCallback(async (uid: string) => {
@@ -74,7 +109,17 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
     }, []);
 
     const sendMessage = useCallback(async (content: string) => {
+        console.log("[sendMessage] ====== START ======");
+        console.log("[sendMessage] isBusy:", isBusyRef.current, "isLoading:", isLoading, "isStreaming:", isStreaming);
+
+        // Prevent double-calls
+        if (isBusyRef.current) {
+            console.warn("[sendMessage] BLOCKED — already processing a message");
+            return;
+        }
+
         if (!isModerator && conversationsToday >= 3) {
+            console.log("[sendMessage] BLOCKED — daily limit reached");
             toast({
                 title: "Límite diario alcanzado",
                 description: "Has llegado a tu límite de 3 conversaciones hoy. Vuelve mañana para continuar.",
@@ -83,6 +128,10 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             return;
         }
 
+        // Mark as busy IMMEDIATELY
+        isBusyRef.current = true;
+
+        // Clean up any previous typing animation
         if (typingIntervalRef.current) {
             clearInterval(typingIntervalRef.current);
             typingIntervalRef.current = null;
@@ -97,10 +146,16 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
         const newUserMsgCount = userMessageCount + 1;
         setUserMessageCount(newUserMsgCount);
         setMessages((prev) => [...prev, userMessage]);
-        await saveMessage(userMessage);
         setIsLoading(true);
 
-        const recentMessages = [...messages, userMessage].slice(-10);
+        console.log("[sendMessage] User message added, isLoading=true");
+
+        // Save message (non-blocking — don't let DB errors kill the chat)
+        saveMessage(userMessage).catch(e => console.error("[sendMessage] save error:", e));
+
+        // Build chat history from current messages + new message
+        const currentMessages = [...messages, userMessage];
+        const recentMessages = currentMessages.slice(-10);
         const chatHistory = recentMessages.map((m) => ({
             role: m.role as "user" | "assistant",
             content: m.content,
@@ -111,14 +166,16 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             : '';
 
         try {
-            // Llama a /api/therapy-chat (Vercel serverless)
-            // La API key está segura en el servidor
+            console.log("[sendMessage] Calling callGemini with", chatHistory.length, "messages");
+
             const fullContent = await callGemini(
                 chatHistory,
                 "chat",
                 userContext,
                 totalConversations
             );
+
+            console.log("[sendMessage] Gemini responded, length:", fullContent.length);
 
             setIsLoading(false);
             setIsStreaming(true);
@@ -131,6 +188,7 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
             setMessages((prev) => [...prev, assistantMessage]);
 
             // Typing animation
+            console.log("[sendMessage] Starting typing animation");
             await new Promise<void>((resolve) => {
                 let charIndex = 0;
                 const charsPerTick = 3;
@@ -158,20 +216,28 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
                 }, intervalMs);
             });
 
-            await saveMessage({ ...assistantMessage, content: fullContent });
+            console.log("[sendMessage] Typing animation done, saving assistant message");
+
+            // Save assistant message (non-blocking)
+            saveMessage({ ...assistantMessage, content: fullContent }).catch(e =>
+                console.error("[sendMessage] save assistant error:", e)
+            );
+
             setIsStreaming(false);
             setTotalConversations((prev) => prev + 1);
 
             if (!isModerator) {
-                const allMessages = [...messages, userMessage, { ...assistantMessage, content: fullContent }];
+                const allMessages = [...currentMessages, { ...assistantMessage, content: fullContent }];
                 const uCount = allMessages.filter(m => m.role === "user").length;
                 const aCount = allMessages.filter(m => m.role === "assistant" && m.content.trim().length > 0).length;
                 const exchanges = Math.min(uCount, aCount);
                 setConversationsToday(Math.min(Math.floor(exchanges / 3), 3));
             }
 
+            console.log("[sendMessage] ====== COMPLETE ======");
+
         } catch (error) {
-            console.error("Chat error:", error);
+            console.error("[sendMessage] ERROR:", error);
             setUserMessageCount((prev) => Math.max(prev - 1, 0));
             toast({
                 title: "Error de conexión",
@@ -179,8 +245,10 @@ export function useChat(userId: string | null, userProfile: UserProfile | null) 
                 variant: "destructive",
             });
         } finally {
+            console.log("[sendMessage] FINALLY — resetting isLoading, isStreaming, isBusy");
             setIsLoading(false);
             setIsStreaming(false);
+            isBusyRef.current = false;
             if (typingIntervalRef.current) {
                 clearInterval(typingIntervalRef.current);
                 typingIntervalRef.current = null;
